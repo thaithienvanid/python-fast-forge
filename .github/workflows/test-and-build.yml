@@ -1,0 +1,316 @@
+name: Test & Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13"
+  POSTGRES_PASSWORD: postgres
+  REDIS_PORT: 6379
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          dependency-groups: dev
+
+      - name: Check formatting
+        run: uv run ruff format --check src tests
+
+      - name: Lint code
+        run: uv run ruff check src tests
+
+      - name: Type check
+        run: uv run mypy src
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          dependency-groups: dev security
+
+      - name: Scan code with Bandit
+        run: |
+          uv run bandit -c pyproject.toml -r src -f json -o bandit-report.json || true
+          uv run bandit -c pyproject.toml -r src -f screen || true
+
+      - name: Audit dependencies
+        run: |
+          uv run pip-audit || true
+          uv run safety check --json || true
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: security-reports
+          path: bandit-report.json
+          retention-days: 30
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ matrix.python-version }}
+          dependency-groups: dev test
+
+      - name: Run unit tests
+        run: |
+          uv run pytest tests/unit/ \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --durations=10 \
+            -v
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/test_db
+          REDIS_URL: redis://localhost:${{ env.REDIS_PORT }}
+          APP_ENV: testing
+        run: |
+          uv run pytest tests/integration/ \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Archive coverage report
+        if: matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lint, test]
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: python-fast-forge:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify API image
+        run: |
+          docker run --rm python-fast-forge:test python -c "
+          import sys
+          from src.presentation.api import create_app
+          app = create_app()
+          print('✅ API image validated')
+          print(f'Python: {sys.version}')
+          print(f'FastAPI: {app is not None}')
+          "
+
+      - name: Check worker Dockerfile
+        id: worker_check
+        run: |
+          if [ -f "Dockerfile.worker" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build worker image
+        if: steps.worker_check.outputs.exists == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          push: false
+          load: true
+          tags: python-fast-forge:worker
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify worker image
+        if: steps.worker_check.outputs.exists == 'true'
+        run: |
+          docker run --rm python-fast-forge:worker python -c "
+          import sys
+          print('✅ Worker image validated')
+          print(f'Python: {sys.version}')
+          "
+
+      - name: Scan for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: python-fast-forge:test
+          format: sarif
+          output: trivy-results.sarif
+        continue-on-error: true
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
+
+  metrics:
+    name: Code Metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          dependency-groups: dev
+
+      - name: Generate metrics
+        run: |
+          echo "📊 Code Statistics"
+          echo "=================="
+          echo "Python files: $(find src tests -name '*.py' | wc -l)"
+          echo "Source files: $(find src -name '*.py' | wc -l)"
+          echo "Test files: $(find tests -name 'test_*.py' | wc -l)"
+          echo "Lines of code: $(find src -name '*.py' -exec wc -l {} + | tail -1 | awk '{print $1}')"
+          echo ""
+          echo "🏗️ Architecture"
+          echo "=================="
+          echo "Models: $(find src/domain/models -name '*.py' ! -name '__init__.py' 2>/dev/null | wc -l)"
+          echo "Use cases: $(find src/app/usecases -name '*.py' ! -name '__init__.py' 2>/dev/null | wc -l)"
+          echo "Repositories: $(find src/infrastructure/repositories -name '*_repository.py' 2>/dev/null | wc -l)"
+          echo "API routes: $(find src/presentation/api -name '*.py' ! -name '__init__.py' 2>/dev/null | wc -l)"
+
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, build, metrics]
+    if: always()
+
+    steps:
+      - name: Evaluate results
+        run: |
+          echo "╔══════════════════════════════════════════════════╗"
+          echo "║  CI Pipeline Results                             ║"
+          echo "╚══════════════════════════════════════════════════╝"
+          echo ""
+          echo "Lint:     ${{ needs.lint.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Tests:    ${{ needs.test.result }}"
+          echo "Build:    ${{ needs.build.result }}"
+          echo "Metrics:  ${{ needs.metrics.result }}"
+          echo ""
+
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ Pipeline failed"
+            exit 1
+          fi
+
+          echo "✅ Pipeline passed"
