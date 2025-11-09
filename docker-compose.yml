@@ -1,0 +1,297 @@
+# Docker Compose for Python FastAPI Boilerplate
+#
+# Quick Start:
+#   docker-compose --profile infra up -d              # Just infrastructure (for local dev)
+#   docker-compose --profile infra --profile app up -d # All services (infra + app)
+#   docker-compose logs -f api                        # View API logs
+#   docker-compose down                               # Stop all services
+#
+# Profiles:
+#   infra:     Infrastructure services (PostgreSQL, Redis, Mailpit, Temporal)
+#   app:       Application services (API, Worker)
+#   telemetry: Observability stack (OpenTelemetry, Jaeger, Prometheus, Grafana)
+#
+# Local Development (recommended):
+#   Start infrastructure, run API/worker on host:
+#     docker-compose --profile infra up -d
+#     uv run alembic upgrade head
+#     uv run python main.py            # API on host
+#     uv run python worker.py          # Worker on host
+#
+# Full Docker Stack:
+#   Start everything in Docker:
+#     docker-compose --profile infra --profile app up -d
+#
+# With Telemetry:
+#   Start infrastructure + telemetry for local development:
+#     docker-compose --profile infra --profile telemetry up -d
+#   Or start everything including telemetry:
+#     docker-compose --profile infra --profile app --profile telemetry up -d
+#
+# Services:
+#   - API (FastAPI)       http://localhost:8000      (API endpoints)
+#   - API Docs           http://localhost:8000/docs  (Swagger UI)
+#   - PostgreSQL         localhost:5432              (Database)
+#   - Redis              localhost:6379              (Cache)
+#   - Mailpit UI         http://localhost:8025       (Email testing)
+#   - Temporal UI        http://localhost:8080       (Workflow monitoring)
+#   - Grafana UI         http://localhost:3000       (Dashboards)
+#   - Jaeger UI          http://localhost:16686      (Tracing)
+#   - Prometheus UI      http://localhost:9090       (Metrics)
+
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: fastapi-postgres
+    profiles: ["infra", "app"]
+    environment:
+      POSTGRES_DB: fastapi_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Redis Cache & Broker
+  redis:
+    image: redis:7-alpine
+    container_name: fastapi-redis
+    profiles: ["infra", "app"]
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - app-network
+
+  # Mailpit - Email Testing (Development only)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: fastapi-mailpit
+    profiles: ["infra", "app"]
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - app-network
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-api
+    profiles: ["app"]
+    command: python main.py
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi_db
+
+      # Redis & Cache
+      REDIS_URL: redis://redis:6379/0
+      CACHE_ENABLED: "true"
+
+      # Temporal
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: fastapi-tasks
+
+      # Email (Mailpit for development)
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+      EMAIL_FROM: noreply@fastapi.local
+
+      # Application Settings
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: INFO
+      SECRET_KEY: dev-secret-key-change-in-production-32-chars-minimum
+
+      # CORS (allow all in development)
+      CORS_ORIGINS: "*"
+
+      # Monitoring
+      ENABLE_OPENTELEMETRY: "false"
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app  # Hot reload - mount source code
+      - /app/.venv  # Prevent overwriting venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    networks:
+      - app-network
+
+  # Temporal Server
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: fastapi-temporal
+    profiles: ["infra", "app"]
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"  # Temporal gRPC
+      - "8080:8080"  # Temporal UI
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - temporal_data:/etc/temporal
+
+  # Temporal Worker
+  temporal-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-temporal-worker
+    profiles: ["app"]
+    command: python worker.py
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi_db
+      REDIS_URL: redis://redis:6379/0
+      CACHE_ENABLED: "true"
+      TEMPORAL_HOST: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      TEMPORAL_TASK_QUEUE: fastapi-tasks
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+      EMAIL_FROM: noreply@fastapi.local
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: INFO
+      SECRET_KEY: dev-secret-key-change-in-production-32-chars-minimum
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    networks:
+      - app-network
+
+  # ============================================================================
+  # Telemetry Stack (OpenTelemetry + Jaeger + Prometheus + Grafana)
+  # ============================================================================
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    container_name: fastapi-otel-collector
+    profiles: ["telemetry"]
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+    networks:
+      - app-network
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.56
+    container_name: fastapi-jaeger
+    profiles: ["telemetry"]
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14268:14268" # Jaeger collector HTTP
+      - "14250:14250" # Jaeger collector gRPC
+    networks:
+      - app-network
+
+  # Prometheus - Metrics Storage & Queries
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: fastapi-prometheus
+    profiles: ["telemetry"]
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - app-network
+
+  # Grafana - Dashboards & Visualization
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: fastapi-grafana
+    profiles: ["telemetry"]
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - jaeger
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  temporal_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

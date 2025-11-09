@@ -1,0 +1,400 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:  # Allow manual trigger
+
+# Cancel in-progress runs for the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Permissions for the workflow
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+# Environment variables
+env:
+  PYTHON_VERSION: "3.13"
+  UV_CACHE_DIR: /tmp/.uv-cache
+
+jobs:
+  # ========================================
+  # Job 1: Fast Feedback - Linting & Formatting
+  # ========================================
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run Ruff formatter check
+        run: uv run ruff format --check src tests
+
+      - name: Run Ruff linter
+        run: uv run ruff check src tests
+
+      - name: Run MyPy type checker
+        run: uv run mypy src
+
+  # ========================================
+  # Job 2: Security Scanning
+  # ========================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --group dev --group security
+
+      - name: Run Bandit security linter
+        run: uv run bandit -c pyproject.toml -r src -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Display Bandit results
+        if: always()
+        run: uv run bandit -c pyproject.toml -r src -f screen
+        continue-on-error: true
+
+      - name: Run pip-audit dependency scanner
+        run: uv run pip-audit
+        continue-on-error: true
+
+      - name: Run Safety dependency scanner
+        run: uv run safety check --json
+        continue-on-error: true
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+  # ========================================
+  # Job 3: Test Matrix (Multiple Python Versions)
+  # ========================================
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint]  # Run after lint for faster failure feedback
+
+    strategy:
+      fail-fast: false  # Continue testing other versions even if one fails
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    services:
+      # PostgreSQL service
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Redis service
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: uv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ matrix.python-version }}-
+            uv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --group dev --group test
+
+      - name: Run unit tests
+        run: |
+          uv run pytest tests/unit/ \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --durations=10 \
+            -v
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          APP_ENV: testing
+        run: |
+          uv run pytest tests/integration/ \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      - name: Upload coverage to Codecov (Python 3.13 only)
+        if: matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage report
+        if: matrix.python-version == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+  # ========================================
+  # Job 4: Docker Build & Validation
+  # ========================================
+  docker:
+    name: Docker Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [test]  # Only build Docker after tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build API Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: python-fast-forge:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test API Docker image
+        run: |
+          docker run --rm python-fast-forge:test python -c "
+          import sys
+          from src.presentation.api import create_app
+          app = create_app()
+          print('✅ Docker build successful')
+          print(f'Python version: {sys.version}')
+          print(f'FastAPI app loaded: {app is not None}')
+          "
+
+      - name: Check if Worker Dockerfile exists
+        id: check_worker
+        run: |
+          if [ -f "Dockerfile.worker" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Worker Docker image
+        if: steps.check_worker.outputs.exists == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          push: false
+          load: true
+          tags: python-fast-forge:worker
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Worker Docker image
+        if: steps.check_worker.outputs.exists == 'true'
+        run: |
+          docker run --rm python-fast-forge:worker python -c "
+          import sys
+          print('✅ Worker Docker build successful')
+          print(f'Python version: {sys.version}')
+          "
+
+      - name: Scan Docker image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: python-fast-forge:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # ========================================
+  # Job 5: Code Quality Metrics
+  # ========================================
+  quality-metrics:
+    name: Code Quality Metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Calculate code metrics
+        run: |
+          echo "📊 Code Statistics:"
+          echo "===================="
+          echo "Total Python files: $(find src tests -name '*.py' | wc -l)"
+          echo "Source files: $(find src -name '*.py' | wc -l)"
+          echo "Test files: $(find tests -name 'test_*.py' | wc -l)"
+          echo "Lines of code: $(find src -name '*.py' -exec wc -l {} + | tail -1 | awk '{print $1}')"
+          echo ""
+          echo "🏗️  Architecture:"
+          echo "===================="
+          echo "Domain models: $(find src/domain/models -name '*.py' ! -name '__init__.py' | wc -l)"
+          echo "Use cases: $(find src/app/usecases -name '*.py' ! -name '__init__.py' | wc -l)"
+          echo "Repositories: $(find src/infrastructure/repositories -name '*_repository.py' | wc -l)"
+          echo "API endpoints: $(find src/presentation/api -name '*.py' ! -name '__init__.py' | wc -l)"
+
+  # ========================================
+  # Job 6: CI Success Summary
+  # ========================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, security, test, docker, quality-metrics]
+    if: always()  # Run even if some jobs are skipped
+
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║  CI Pipeline Results                                       ║"
+          echo "╚════════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Job Results:"
+          echo "  Lint:            ${{ needs.lint.result }}"
+          echo "  Security:        ${{ needs.security.result }}"
+          echo "  Tests:           ${{ needs.test.result }}"
+          echo "  Docker:          ${{ needs.docker.result }}"
+          echo "  Quality Metrics: ${{ needs.quality-metrics.result }}"
+          echo ""
+
+          # Fail if any required job failed
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.docker.result }}" != "success" ]; then
+            echo "❌ Required jobs failed"
+            exit 1
+          fi
+
+          echo "✅ All required jobs passed!"
