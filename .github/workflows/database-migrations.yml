@@ -1,0 +1,226 @@
+name: Database Migrations
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/domain/models/**"
+      - "migrations/**"
+      - "atlas.hcl"
+      - "load_models.py"
+  push:
+    branches: [main, develop]
+    paths:
+      - "src/domain/models/**"
+      - "migrations/**"
+      - "atlas.hcl"
+      - "load_models.py"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.13"
+  POSTGRES_PASSWORD: postgres
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check-token:
+    name: Check Atlas Cloud Token
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      has_token: ${{ steps.check.outputs.has_token }}
+
+    steps:
+      - name: Check token availability
+        id: check
+        run: echo "has_token=${{ secrets.ATLAS_CLOUD_TOKEN != '' }}" >> $GITHUB_OUTPUT
+
+  lint:
+    name: Lint Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: check-token
+    if: needs.check-token.outputs.has_token == 'true'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: atlas_lint
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Atlas CLI
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Lint migration files
+        run: atlas migrate lint --env sqlalchemy
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_lint?sslmode=disable
+
+  validate:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: atlas_validate
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Atlas CLI
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Validate migration files
+        run: atlas migrate validate --env sqlalchemy
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_validate?sslmode=disable
+
+  test-apply:
+    name: Test Migration Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: atlas_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Atlas CLI
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Dry run migrations
+        run: atlas migrate apply --env local --dry-run
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_test?sslmode=disable
+
+      - name: Apply migrations
+        run: atlas migrate apply --env local
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_test?sslmode=disable
+
+      - name: Verify migration status
+        run: atlas migrate status --env local
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_test?sslmode=disable
+
+      - name: Inspect schema
+        run: atlas schema inspect --env local
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_test?sslmode=disable
+
+  check-drift:
+    name: Check Schema Drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: atlas_drift
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python environment
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Atlas CLI
+        uses: ariga/setup-atlas@v0
+        with:
+          cloud-token: ${{ secrets.ATLAS_CLOUD_TOKEN }}
+
+      - name: Detect uncommitted schema changes
+        run: |
+          atlas migrate diff drift_check --env sqlalchemy || true
+
+          if [ -n "$(git status --porcelain migrations/)" ]; then
+            echo "::error::Uncommitted schema changes detected"
+            echo "Run: make migrate-create m=\"describe_your_changes\""
+            exit 1
+          fi
+
+          echo "✅ No schema drift detected"
+        env:
+          DATABASE_URL: postgresql://postgres:${{ env.POSTGRES_PASSWORD }}@localhost:5432/atlas_drift?sslmode=disable
