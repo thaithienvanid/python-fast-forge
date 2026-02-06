@@ -64,7 +64,9 @@ class EventBus:
     def subscribe(
         self,
         event_type: type[DomainEvent],
-    ) -> Callable[[Callable[[DomainEvent], Awaitable[None]]], Callable[[DomainEvent], Awaitable[None]]]:
+    ) -> Callable[
+        [Callable[[DomainEvent], Awaitable[None]]], Callable[[DomainEvent], Awaitable[None]]
+    ]:
         """Subscribe to a specific event type.
 
         Can be used as a decorator or function.
