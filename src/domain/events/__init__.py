@@ -18,7 +18,7 @@ Example:
 """
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.event_bus import EventBus, get_event_bus
+from src.domain.events.event_bus import EventBus, get_event_bus, reset_event_bus
 from src.domain.events.user_events import (
     UserCreatedEvent,
     UserDeletedEvent,
@@ -35,4 +35,5 @@ __all__ = [
     "UserRestoredEvent",
     "UserUpdatedEvent",
     "get_event_bus",
+    "reset_event_bus",
 ]
