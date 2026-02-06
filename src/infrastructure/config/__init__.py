@@ -160,6 +160,70 @@ class Settings(BaseSettings):
         """Backward compatibility: access_token_expire_minutes."""
         return self.security.access_token_expire_minutes
 
+    # Database backward compatibility
+    @property
+    def database_echo(self) -> bool:
+        """Backward compatibility: database_echo."""
+        return self.database.database_echo
+
+    @property
+    def database_pool_size(self) -> int:
+        """Backward compatibility: database_pool_size."""
+        return self.database.database_pool_size
+
+    @property
+    def database_max_overflow(self) -> int:
+        """Backward compatibility: database_max_overflow."""
+        return self.database.database_max_overflow
+
+    # Application backward compatibility
+    @property
+    def log_level(self) -> str:
+        """Backward compatibility: log_level."""
+        return self.app.log_level
+
+    # Security backward compatibility
+    @property
+    def rate_limit_enabled(self) -> bool:
+        """Backward compatibility: rate_limit_enabled."""
+        return self.security.rate_limit_enabled
+
+    @property
+    def rate_limit_per_minute(self) -> int:
+        """Backward compatibility: rate_limit_per_minute."""
+        return self.security.rate_limit_per_minute
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        """Backward compatibility: cors_allow_credentials."""
+        return self.security.cors_allow_credentials
+
+    @property
+    def cors_allow_methods(self) -> list[str]:
+        """Backward compatibility: cors_allow_methods."""
+        return self.security.cors_allow_methods
+
+    @property
+    def cors_allow_headers(self) -> list[str]:
+        """Backward compatibility: cors_allow_headers."""
+        return self.security.cors_allow_headers
+
+    @property
+    def cors_expose_headers(self) -> list[str]:
+        """Backward compatibility: cors_expose_headers."""
+        return self.security.cors_expose_headers
+
+    # Workflow backward compatibility
+    @property
+    def temporal_host(self) -> str:
+        """Backward compatibility: temporal_host."""
+        return self.workflow.temporal_host
+
+    @property
+    def temporal_namespace(self) -> str:
+        """Backward compatibility: temporal_namespace."""
+        return self.workflow.temporal_namespace
+
     def get_jwt_private_key(self) -> str:
         """Backward compatibility: get_jwt_private_key."""
         return self.security.get_jwt_private_key()

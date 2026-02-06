@@ -242,14 +242,25 @@ exclude = [
 "tests/**/*.py" = [
     "S101", "S105", "S106", "S311",  # Security checks (assert, hardcoded secrets, random)
     "PLR2004", "PT011", "PT018",      # Complexity & pytest style
-    "ARG001", "ARG002",               # Unused arguments (pytest fixtures)
+    "ARG001", "ARG002", "ARG005",     # Unused arguments (pytest fixtures, lambdas)
     "DTZ001", "DTZ005",               # Datetime without timezone
     "PLC0415",                        # Lazy imports for test isolation
     "RUF001", "RUF005", "RUF043", "RUF059",  # Ruff-specific test patterns
     "SIM105", "SIM201",               # Simplification (readability preference)
+    "T201",                           # print statements (OK for test output/benchmarks)
+    "F841",                           # Unused variables (sometimes intentional in tests)
 ]
 "tests/conftest.py" = ["DTZ005"]     # Datetime for test fixtures
 "tests/unit/test_config.py" = ["S104"]  # Allow 0.0.0.0 in config tests
+
+# Result type - unused args are part of interface contract
+"src/utils/result.py" = ["ARG002"]   # Unused args in Ok/Err methods (intentional)
+
+# Domain events - Pydantic Config pattern
+"src/domain/events/base.py" = ["RUF012"]  # json_encoders in Pydantic Config
+
+# Config - allow binding to all interfaces for development
+"src/infrastructure/config/app_settings.py" = ["S104"]  # 0.0.0.0 binding OK for dev
 
 # Re-exports in __init__.py files
 "**/__init__.py" = ["F401", "F403"]  # Unused/wildcard imports

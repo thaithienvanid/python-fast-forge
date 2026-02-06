@@ -5,7 +5,7 @@ experts care about. They are immutable facts about the past.
 """
 
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
