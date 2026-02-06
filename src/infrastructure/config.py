@@ -20,10 +20,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Private: Cache for ephemeral JWT keys in development (not from env vars)
-    _ephemeral_private_key: str | None = None
-    _ephemeral_public_key: str | None = None
-
     # Application
     app_name: str = Field(default="python-fast-forge", alias="APP_NAME")
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
@@ -230,21 +226,38 @@ class Settings(BaseSettings):
                     raise ValueError(f"JWT private key file not found: {self.jwt_private_key_path}")
                 return private_key_path.read_text()
 
-            # Priority 3: Development - generate ephemeral key (cached)
+            # Priority 3: Development - generate and persist ephemeral key
             if not self.is_production:
-                # Cache key to ensure same key across multiple calls
-                if self._ephemeral_private_key is None:
-                    from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
+                # Check for existing ephemeral key file
+                ephemeral_key_path = Path(".dev_jwt_private_key.pem")
 
-                    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-                    pem = private_key.private_bytes(
-                        encoding=serialization.Encoding.PEM,
-                        format=serialization.PrivateFormat.PKCS8,
-                        encryption_algorithm=serialization.NoEncryption(),
-                    )
-                    self._ephemeral_private_key = pem.decode("utf-8")
+                if ephemeral_key_path.exists():
+                    # Load existing ephemeral key
+                    return ephemeral_key_path.read_text()
 
-                return self._ephemeral_private_key
+                # Generate new ephemeral key and persist it
+                from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
+
+                private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+                pem = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+                pem_str = pem.decode("utf-8")
+
+                # Save to file for persistence across restarts
+                ephemeral_key_path.write_text(pem_str)
+                # Add to .gitignore to prevent accidental commit
+                gitignore_path = Path(".gitignore")
+                if gitignore_path.exists():
+                    gitignore_content = gitignore_path.read_text()
+                    if ".dev_jwt_private_key.pem" not in gitignore_content:
+                        with gitignore_path.open("a") as f:
+                            f.write("\n# Development JWT keys (auto-generated)\n")
+                            f.write(".dev_jwt_private_key.pem\n")
+
+                return pem_str
 
             raise ValueError(
                 "JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_PATH must be set in production for ES256 algorithm"

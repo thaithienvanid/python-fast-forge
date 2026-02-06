@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 
+from src.domain.constants import UserLimits
 from src.domain.exceptions import EntityNotFoundError, ValidationError
 from src.domain.interfaces import IUserRepository
 from src.domain.models.user import User
@@ -51,7 +52,7 @@ class ListUsersUseCase:
     async def execute(
         self,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = UserLimits.LIST_DEFAULT_LIMIT,
         tenant_id: UUID | None = None,
     ) -> list[User]:
         """Execute the use case.
@@ -69,8 +70,10 @@ class ListUsersUseCase:
         """
         if skip < 0:
             raise ValidationError("Skip must be non-negative")
-        if limit < 1 or limit > 100:
-            raise ValidationError("Limit must be between 1 and 100")
+        if limit < UserLimits.LIST_MIN_LIMIT or limit > UserLimits.LIST_MAX_LIMIT:
+            raise ValidationError(
+                f"Limit must be between {UserLimits.LIST_MIN_LIMIT} and {UserLimits.LIST_MAX_LIMIT}"
+            )
         return await self._repository.get_all(skip=skip, limit=limit, tenant_id=tenant_id)
 
 
@@ -134,13 +137,37 @@ class CreateUserUseCase:
                 id=f"send-welcome-email-{created_user.id}",
                 task_queue="fastapi-tasks",
             )
-        except Exception as e:
-            # Log error but don't fail user creation if workflow start fails
+        except (ConnectionError, TimeoutError, OSError) as e:
+            # Network/connection errors when starting workflow
             from src.infrastructure.logging.config import get_logger
 
             logger = get_logger(__name__)
             logger.error(
-                "failed_to_start_welcome_email_workflow", error=str(e), user_id=str(created_user.id)
+                "failed_to_start_welcome_email_workflow_connection_error",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=str(created_user.id),
+            )
+        except ImportError as e:
+            # Temporal client or workflow not available
+            from src.infrastructure.logging.config import get_logger
+
+            logger = get_logger(__name__)
+            logger.error(
+                "failed_to_start_welcome_email_workflow_import_error",
+                error=str(e),
+                user_id=str(created_user.id),
+            )
+        except Exception as e:
+            # Unexpected errors (last resort fallback)
+            from src.infrastructure.logging.config import get_logger
+
+            logger = get_logger(__name__)
+            logger.error(
+                "failed_to_start_welcome_email_workflow_unexpected",
+                error=str(e),
+                error_type=type(e).__name__,
+                user_id=str(created_user.id),
             )
 
         return created_user
@@ -304,8 +331,10 @@ class BatchCreateUsersUseCase:
         if not users_data:
             raise ValueError("users_data cannot be empty")
 
-        if len(users_data) > 100:
-            raise ValidationError("Cannot create more than 100 users at once")
+        if len(users_data) > UserLimits.MAX_BATCH_SIZE:
+            raise ValidationError(
+                f"Cannot create more than {UserLimits.MAX_BATCH_SIZE} users at once"
+            )
 
         created_users: list[User] = []
 
@@ -322,16 +351,21 @@ class BatchCreateUsersUseCase:
                 if len(usernames) != len(set(usernames)):
                     raise ValidationError("Duplicate usernames found in batch")
 
-                # Check for existing users with same email or username
-                for email in emails:
-                    existing = await uow.users.get_by_email(email)
-                    if existing:
-                        raise ValidationError(f"User with email {email} already exists")
+                # Check for existing users with same email or username (bulk query optimization)
+                # This avoids N+1 query problem by using WHERE IN instead of N individual queries
+                existing_users_by_email = await uow.users.find_by_emails(emails)
+                if existing_users_by_email:
+                    existing_emails = [user.email for user in existing_users_by_email]
+                    raise ValidationError(
+                        f"Users with emails {existing_emails} already exist"
+                    )
 
-                for username in usernames:
-                    existing = await uow.users.get_by_username(username)
-                    if existing:
-                        raise ValidationError(f"User with username {username} already exists")
+                existing_users_by_username = await uow.users.find_by_usernames(usernames)
+                if existing_users_by_username:
+                    existing_usernames = [user.username for user in existing_users_by_username]
+                    raise ValidationError(
+                        f"Users with usernames {existing_usernames} already exist"
+                    )
 
                 # Create all users
                 for user_data in users_data:
@@ -458,7 +492,7 @@ class GetDeletedUsersUseCase:
     async def execute(
         self,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = UserLimits.LIST_DEFAULT_LIMIT,
         tenant_id: UUID | None = None,
     ) -> list[User]:
         """Execute the get deleted users use case.
@@ -476,8 +510,10 @@ class GetDeletedUsersUseCase:
         """
         if skip < 0:
             raise ValidationError("Skip must be non-negative")
-        if limit < 1 or limit > 100:
-            raise ValidationError("Limit must be between 1 and 100")
+        if limit < UserLimits.LIST_MIN_LIMIT or limit > UserLimits.LIST_MAX_LIMIT:
+            raise ValidationError(
+                f"Limit must be between {UserLimits.LIST_MIN_LIMIT} and {UserLimits.LIST_MAX_LIMIT}"
+            )
 
         return await self._repository.get_deleted(skip=skip, limit=limit, tenant_id=tenant_id)
 
@@ -497,7 +533,7 @@ class SearchUsersUseCase:
         self,
         filterset: Any,  # FilterSet type (avoiding circular import)
         skip: int = 0,
-        limit: int = 100,
+        limit: int = UserLimits.LIST_DEFAULT_LIMIT,
     ) -> tuple[list[User], int]:
         """Search users with FilterSet.
 

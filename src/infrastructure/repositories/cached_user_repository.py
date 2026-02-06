@@ -213,5 +213,35 @@ class CachedUserRepository(CachedBaseRepository[User], IUserRepository[User]):
 
         return user
 
+    async def find_by_emails(self, emails: list[str]) -> list[User]:
+        """Retrieve multiple users by emails (pass-through, no caching).
+
+        Bulk operations are not cached due to the complexity of cache invalidation
+        and the variability of input combinations. For frequently accessed individual
+        users, use get_by_email() which supports caching.
+
+        Args:
+            emails: List of email addresses to search for
+
+        Returns:
+            List of users with matching emails
+        """
+        return await self._user_repository.find_by_emails(emails)
+
+    async def find_by_usernames(self, usernames: list[str]) -> list[User]:
+        """Retrieve multiple users by usernames (pass-through, no caching).
+
+        Bulk operations are not cached due to the complexity of cache invalidation
+        and the variability of input combinations. For frequently accessed individual
+        users, use get_by_username() which supports caching.
+
+        Args:
+            usernames: List of usernames to search for
+
+        Returns:
+            List of users with matching usernames
+        """
+        return await self._user_repository.find_by_usernames(usernames)
+
     # Note: find() and count() are inherited from CachedBaseRepository
     # as pass-through methods (not cached)
