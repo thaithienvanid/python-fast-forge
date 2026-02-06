@@ -7,15 +7,7 @@ and username lookups.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
 from uuid import UUID
-
-
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
-from typing import TYPE_CHECKING, Any
 
 from src.domain.interfaces import IUserRepository
 from src.domain.models.user import User

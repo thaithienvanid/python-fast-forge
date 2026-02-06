@@ -6,14 +6,9 @@ enable dependency inversion and facilitate testing with mock implementations.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
+from src.domain.filtering import IFilterSet
 
 
 class IRepository[T](ABC):
@@ -146,7 +141,7 @@ class IRepository[T](ABC):
     @abstractmethod
     async def find(
         self,
-        filterset: "FilterSet",
+        filterset: IFilterSet,
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
@@ -172,7 +167,7 @@ class IRepository[T](ABC):
         """
 
     @abstractmethod
-    async def count(self, filterset: "FilterSet") -> int:
+    async def count(self, filterset: IFilterSet) -> int:
         """Count total entities matching filter criteria without pagination.
 
         Useful for implementing pagination UI that shows total count.
