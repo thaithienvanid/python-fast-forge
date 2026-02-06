@@ -224,6 +224,54 @@ class Settings(BaseSettings):
         """Backward compatibility: temporal_namespace."""
         return self.workflow.temporal_namespace
 
+    # Observability backward compatibility
+    @property
+    def otel_enabled(self) -> bool:
+        """Backward compatibility: otel_enabled."""
+        return self.observability.otel_enabled
+
+    @property
+    def otel_service_name(self) -> str:
+        """Backward compatibility: otel_service_name."""
+        return self.observability.otel_service_name
+
+    @property
+    def otel_trace_sample_rate(self) -> float:
+        """Backward compatibility: otel_trace_sample_rate."""
+        return self.observability.otel_trace_sample_rate
+
+    @property
+    def otel_exporter_otlp_endpoint(self) -> str:
+        """Backward compatibility: otel_exporter_otlp_endpoint."""
+        return self.observability.otel_exporter_otlp_endpoint
+
+    @property
+    def otel_exporter_otlp_insecure(self) -> bool:
+        """Backward compatibility: otel_exporter_otlp_insecure."""
+        return self.observability.otel_exporter_otlp_insecure
+
+    # Cache backward compatibility
+    @property
+    def redis_max_connections(self) -> int:
+        """Backward compatibility: redis_max_connections."""
+        return self.cache.redis_max_connections
+
+    # API backward compatibility
+    @property
+    def docs_url(self) -> str:
+        """Backward compatibility: docs_url."""
+        return self.app.docs_url
+
+    @property
+    def redoc_url(self) -> str:
+        """Backward compatibility: redoc_url."""
+        return self.app.redoc_url
+
+    @property
+    def openapi_url(self) -> str:
+        """Backward compatibility: openapi_url."""
+        return self.app.openapi_url
+
     def get_jwt_private_key(self) -> str:
         """Backward compatibility: get_jwt_private_key."""
         return self.security.get_jwt_private_key()
