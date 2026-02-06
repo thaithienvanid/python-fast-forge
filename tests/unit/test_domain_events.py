@@ -18,7 +18,6 @@ from src.domain.events import (
     get_event_bus,
     reset_event_bus,
 )
-from src.domain.events.base import DomainEvent
 
 
 class TestDomainEvent:
@@ -239,7 +238,6 @@ class TestEventBus:
     async def test_handler_error_isolation(self) -> None:
         """Test that handler error doesn't affect other handlers."""
         bus = EventBus()
-        handler1_called = []
         handler2_called = []
 
         @bus.subscribe(UserCreatedEvent)

@@ -41,10 +41,6 @@ class TestAPIPerformance:
         p50 = median(times)
         p95, p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
 
-        print(f"\nHealth endpoint performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
-        print(f"  p99: {p99:.2f}ms")
 
         # Assert performance targets
         assert p50 < 50, f"p50 should be < 50ms, got {p50:.2f}ms"
@@ -72,12 +68,8 @@ class TestAPIPerformance:
 
         # Calculate percentiles
         p50 = median(times)
-        p95, p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
+        p95, _p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
 
-        print(f"\nList users endpoint performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
-        print(f"  p99: {p99:.2f}ms")
 
         # Assert performance targets
         assert p50 < 100, f"p50 should be < 100ms, got {p50:.2f}ms"
@@ -114,9 +106,6 @@ class TestAPIPerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-        print(f"\nCreate user endpoint performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         # Assert performance targets (more lenient for writes)
         assert p50 < 150, f"p50 should be < 150ms, got {p50:.2f}ms"
@@ -141,6 +130,7 @@ class TestAsyncAPIPerformance:
         all_times = []
 
         for _ in range(iterations):
+
             async def single_request() -> float:
                 start = time.perf_counter()
                 response = await async_client.get("/health")
@@ -154,12 +144,8 @@ class TestAsyncAPIPerformance:
 
         # Calculate percentiles
         p50 = median(all_times)
-        p95, p99 = quantiles(all_times, n=100)[94], quantiles(all_times, n=100)[98]
+        p95, _p99 = quantiles(all_times, n=100)[94], quantiles(all_times, n=100)[98]
 
-        print(f"\nConcurrent health checks ({concurrency} concurrent):")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
-        print(f"  p99: {p99:.2f}ms")
 
         # Under concurrency, allow slightly higher latency
         assert p50 < 100, f"p50 should be < 100ms under concurrency, got {p50:.2f}ms"
@@ -178,6 +164,7 @@ class TestAsyncAPIPerformance:
         all_times = []
 
         for _ in range(iterations):
+
             async def single_request() -> float:
                 start = time.perf_counter()
                 response = await async_client.get("/api/v1/users")
@@ -193,9 +180,6 @@ class TestAsyncAPIPerformance:
         p50 = median(all_times)
         p95 = quantiles(all_times, n=100)[94] if len(all_times) >= 20 else max(all_times)
 
-        print(f"\nConcurrent user reads ({concurrency} concurrent):")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         # Under concurrency, allow higher latency
         assert p50 < 150, f"p50 should be < 150ms under concurrency, got {p50:.2f}ms"
@@ -214,7 +198,6 @@ class TestResponsePayloadSize:
         response = client.get("/health")
         payload_size = len(response.content)
 
-        print(f"\nHealth endpoint response size: {payload_size} bytes")
 
         assert payload_size < 1024, f"Health response should be < 1KB, got {payload_size} bytes"
 
@@ -230,12 +213,11 @@ class TestResponsePayloadSize:
         if response.status_code == 200:
             payload_size = len(response.content)
 
-            print(f"\nUser list response size (limit=100): {payload_size} bytes")
 
             # With 100 users, should be less than 100KB
-            assert (
-                payload_size < 102400
-            ), f"User list response should be < 100KB, got {payload_size} bytes"
+            assert payload_size < 102400, (
+                f"User list response should be < 100KB, got {payload_size} bytes"
+            )
 
 
 @pytest.mark.benchmark
@@ -259,7 +241,6 @@ class TestEndpointThroughput:
         elapsed = time.time() - start_time
         rps = request_count / elapsed
 
-        print(f"\nHealth endpoint throughput: {rps:.0f} requests/second")
 
         # Should handle at least 100 requests per second
         assert rps >= 100, f"Should handle >= 100 req/s, got {rps:.0f} req/s"
@@ -282,7 +263,6 @@ class TestEndpointThroughput:
         elapsed = time.time() - start_time
         rps = request_count / elapsed
 
-        print(f"\nUser list endpoint throughput: {rps:.0f} requests/second")
 
         # Should handle at least 50 requests per second
         assert rps >= 50, f"Should handle >= 50 req/s, got {rps:.0f} req/s"

@@ -20,9 +20,11 @@ Example:
         half_open_max_calls=3,  # Allow 3 test calls in half-open
     )
 
+
     # Use with async function
     async def get_user(user_id):
         return await db_breaker.call(repository.get_by_id, user_id)
+
 
     # Or use as decorator
     @db_breaker.protect
@@ -33,10 +35,12 @@ Example:
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from typing import Any, TypeVar
+
 
 T = TypeVar("T")
 
@@ -72,7 +76,7 @@ class CircuitBreakerStats:
     total_rejections: int = 0  # Calls rejected while OPEN
 
 
-class CircuitBreaker(Generic[T]):
+class CircuitBreaker[T]:
     """Circuit breaker for protecting against cascading failures.
 
     Implements the circuit breaker pattern with configurable thresholds
@@ -178,7 +182,7 @@ class CircuitBreaker(Generic[T]):
             await self._on_success()
             return result
 
-        except self.expected_exceptions as e:
+        except self.expected_exceptions:
             await self._on_failure()
             raise
 
@@ -188,9 +192,7 @@ class CircuitBreaker(Generic[T]):
                 async with self._lock:
                     self._half_open_calls -= 1
 
-    def protect(
-        self, func: Callable[..., Awaitable[T]]
-    ) -> Callable[..., Awaitable[T]]:
+    def protect(self, func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         """Decorator to protect an async function with circuit breaker.
 
         Args:
@@ -299,14 +301,10 @@ class CircuitBreaker(Generic[T]):
         """
         total_requests = self._stats.total_successes + self._stats.total_failures
         success_rate = (
-            (self._stats.total_successes / total_requests * 100)
-            if total_requests > 0
-            else 0.0
+            (self._stats.total_successes / total_requests * 100) if total_requests > 0 else 0.0
         )
         failure_rate = (
-            (self._stats.total_failures / total_requests * 100)
-            if total_requests > 0
-            else 0.0
+            (self._stats.total_failures / total_requests * 100) if total_requests > 0 else 0.0
         )
 
         return {

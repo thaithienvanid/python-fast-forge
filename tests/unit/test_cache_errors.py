@@ -3,7 +3,6 @@
 Tests the cache-specific error types used with Result.
 """
 
-import pytest
 
 from src.infrastructure.cache.errors import (
     CacheCompressionError,
@@ -230,9 +229,8 @@ class TestCacheErrorFromException:
 
     def test_timeout_error_conversion(self) -> None:
         """Test conversion of TimeoutError."""
-        import asyncio
 
-        exc = asyncio.TimeoutError()
+        exc = TimeoutError()
         error = cache_error_from_exception(exc, key="user:123")
 
         assert isinstance(error, CacheTimeoutError)

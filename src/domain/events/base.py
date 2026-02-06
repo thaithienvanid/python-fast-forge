@@ -5,7 +5,7 @@ experts care about. They are immutable facts about the past.
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -80,7 +80,9 @@ class DomainEvent(BaseModel):
 
     def __str__(self) -> str:
         """String representation of event."""
-        return f"{self.event_type}(aggregate_id={self.aggregate_id}, occurred_at={self.occurred_at})"
+        return (
+            f"{self.event_type}(aggregate_id={self.aggregate_id}, occurred_at={self.occurred_at})"
+        )
 
     def __repr__(self) -> str:
         """Detailed string representation."""

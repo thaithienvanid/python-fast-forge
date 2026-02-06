@@ -5,13 +5,11 @@ and thread-safety issues in critical code paths.
 """
 
 import asyncio
-from collections import Counter
 from uuid import UUID
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from src.domain.exceptions import ValidationError
 from src.domain.models.user import User
 from src.infrastructure.repositories.user_repository import UserRepository
 
@@ -338,6 +336,7 @@ class TestConcurrentCacheAccess:
 
         Multiple concurrent writes to different keys should work safely.
         """
+
         # Concurrently write to cache
         async def write_cache(key: str, value: dict) -> bool:
             return await mock_cache.set(key, value, ttl=300)

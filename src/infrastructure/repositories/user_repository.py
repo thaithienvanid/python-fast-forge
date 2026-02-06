@@ -91,9 +91,7 @@ class UserRepository(BaseRepository[User], IUserRepository[User]):
         normalized_emails = [email.lower() for email in emails]
 
         result = await self._session.execute(
-            select(User)
-            .where(User.email.in_(normalized_emails))
-            .where(User.deleted_at.is_(None))
+            select(User).where(User.email.in_(normalized_emails)).where(User.deleted_at.is_(None))
         )
         return list(result.scalars().all())
 
@@ -119,8 +117,6 @@ class UserRepository(BaseRepository[User], IUserRepository[User]):
             return []
 
         result = await self._session.execute(
-            select(User)
-            .where(User.username.in_(usernames))
-            .where(User.deleted_at.is_(None))
+            select(User).where(User.username.in_(usernames)).where(User.deleted_at.is_(None))
         )
         return list(result.scalars().all())

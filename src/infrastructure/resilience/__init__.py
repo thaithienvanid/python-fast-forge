@@ -15,6 +15,7 @@ from .circuit_breaker import (
     CircuitState,
 )
 
+
 __all__ = [
     "CircuitBreaker",
     "CircuitBreakerOpenError",

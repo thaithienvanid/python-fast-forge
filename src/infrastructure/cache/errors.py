@@ -5,7 +5,6 @@ context than simple None returns or generic exceptions.
 """
 
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass(frozen=True)

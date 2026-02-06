@@ -73,7 +73,9 @@ class TestSecurityVulnerabilities:
             )
 
             # Should return validation error
-            assert response.status_code in [400, 422], f"SQL injection should be rejected: {payload}"
+            assert response.status_code in [400, 422], (
+                f"SQL injection should be rejected: {payload}"
+            )
 
     def test_xss_attempt_in_user_fields(self, client: TestClient) -> None:
         """Test that XSS attempts are properly sanitized or rejected.
@@ -174,7 +176,7 @@ class TestSecurityVulnerabilities:
 
         for payload in path_traversal_payloads:
             response = client.get(
-                f"/api/v1/users",
+                "/api/v1/users",
                 params={"search": payload},
             )
 

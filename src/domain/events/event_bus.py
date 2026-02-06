@@ -12,6 +12,7 @@ from typing import Any
 from src.domain.events.base import DomainEvent
 from src.infrastructure.logging.config import get_logger
 
+
 logger = get_logger(__name__)
 
 

@@ -26,12 +26,13 @@ from src.domain.events.user_events import (
     UserUpdatedEvent,
 )
 
+
 __all__ = [
     "DomainEvent",
     "EventBus",
-    "get_event_bus",
     "UserCreatedEvent",
-    "UserUpdatedEvent",
     "UserDeletedEvent",
     "UserRestoredEvent",
+    "UserUpdatedEvent",
+    "get_event_bus",
 ]

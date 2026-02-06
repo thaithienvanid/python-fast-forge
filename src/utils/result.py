@@ -14,8 +14,10 @@ Benefits:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import TypeVar
+
 
 T = TypeVar("T")  # Success type
 E = TypeVar("E")  # Error type
@@ -23,7 +25,7 @@ U = TypeVar("U")  # Mapped success type
 
 
 @dataclass(frozen=True)
-class Ok(Generic[T]):
+class Ok[T]:
     """Success result containing a value.
 
     Example:
@@ -139,7 +141,7 @@ class Ok(Generic[T]):
 
 
 @dataclass(frozen=True)
-class Err(Generic[E]):
+class Err[E]:
     """Error result containing an error value.
 
     Example:
@@ -258,7 +260,7 @@ Result = Ok[T] | Err[E]
 
 
 # Convenience functions for creating Results
-def ok(value: T) -> Ok[T]:
+def ok[T](value: T) -> Ok[T]:
     """Create a success Result.
 
     Args:
@@ -275,7 +277,7 @@ def ok(value: T) -> Ok[T]:
     return Ok(value)
 
 
-def err(error: E) -> Err[E]:
+def err[E](error: E) -> Err[E]:
     """Create an error Result.
 
     Args:
@@ -303,17 +305,15 @@ if __name__ == "__main__":
 
     result = divide(10, 2)
     if result.is_ok():
-        print(f"Success: {result.unwrap()}")  # Success: 5.0
+        pass  # Success: 5.0
     else:
-        print(f"Error: {result.error}")
+        pass
 
     # Example 2: Using unwrap_or
     value = divide(10, 0).unwrap_or(0.0)
-    print(f"Value with default: {value}")  # Value with default: 0.0
 
     # Example 3: Chaining with map
     result = divide(10, 2).map(lambda x: x * 2)
-    print(f"Doubled: {result.unwrap()}")  # Doubled: 10.0
 
     # Example 4: Chaining with and_then
     def safe_sqrt(x: float) -> Result[float, str]:
@@ -323,8 +323,6 @@ if __name__ == "__main__":
         return ok(x**0.5)
 
     result = divide(16, 2).and_then(safe_sqrt)
-    print(f"Result: {result.unwrap()}")  # Result: 2.828...
 
     # Example 5: Error propagation
     result = divide(16, 0).and_then(safe_sqrt)
-    print(f"Propagated error: {result.error}")  # Propagated error: Division by zero

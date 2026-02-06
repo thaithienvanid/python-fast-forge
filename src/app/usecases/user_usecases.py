@@ -356,9 +356,7 @@ class BatchCreateUsersUseCase:
                 existing_users_by_email = await uow.users.find_by_emails(emails)
                 if existing_users_by_email:
                     existing_emails = [user.email for user in existing_users_by_email]
-                    raise ValidationError(
-                        f"Users with emails {existing_emails} already exist"
-                    )
+                    raise ValidationError(f"Users with emails {existing_emails} already exist")
 
                 existing_users_by_username = await uow.users.find_by_usernames(usernames)
                 if existing_users_by_username:

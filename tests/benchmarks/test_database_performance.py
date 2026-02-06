@@ -59,10 +59,6 @@ class TestDatabaseReadPerformance:
         p50 = median(times)
         p95, p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
 
-        print(f"\nget_by_id performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
-        print(f"  p99: {p99:.2f}ms")
 
         # Assert performance targets
         assert p50 < 5, f"p50 should be < 5ms, got {p50:.2f}ms"
@@ -103,9 +99,6 @@ class TestDatabaseReadPerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94]
 
-        print(f"\nget_by_email performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
@@ -147,18 +140,15 @@ class TestDatabaseReadPerformance:
 
                 assert len(results) == batch_size
 
-            p50 = median(times)
+            median(times)
             p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-            print(f"\nfind_by_emails (batch_size={batch_size}) performance:")
-            print(f"  p50: {p50:.2f}ms")
-            print(f"  p95: {p95:.2f}ms")
 
             # Performance should scale reasonably with batch size
             expected_p95 = 20 + (batch_size / 10) * 5  # ~20ms + 5ms per 10 items
-            assert (
-                p95 < expected_p95
-            ), f"p95 should be < {expected_p95:.0f}ms for batch size {batch_size}, got {p95:.2f}ms"
+            assert p95 < expected_p95, (
+                f"p95 should be < {expected_p95:.0f}ms for batch size {batch_size}, got {p95:.2f}ms"
+            )
 
 
 @pytest.mark.benchmark
@@ -193,9 +183,6 @@ class TestDatabaseWritePerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-        print(f"\ncreate_user performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         assert p50 < 10, f"p50 should be < 10ms, got {p50:.2f}ms"
         assert p95 < 20, f"p95 should be < 20ms, got {p95:.2f}ms"
@@ -236,9 +223,6 @@ class TestDatabaseWritePerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-        print(f"\nupdate_user performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
@@ -277,9 +261,6 @@ class TestDatabaseWritePerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-        print(f"\nsoft_delete performance:")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
@@ -313,6 +294,7 @@ class TestDatabaseConcurrentPerformance:
         all_times = []
 
         for _ in range(iterations):
+
             async def single_read() -> float:
                 start = time.perf_counter()
                 result = await repository.get_by_id(user_id)
@@ -328,9 +310,6 @@ class TestDatabaseConcurrentPerformance:
         p50 = median(all_times)
         p95 = quantiles(all_times, n=100)[94]
 
-        print(f"\nConcurrent reads ({concurrency} concurrent):")
-        print(f"  p50: {p50:.2f}ms")
-        print(f"  p95: {p95:.2f}ms")
 
         # Under concurrency, allow slightly higher latency
         assert p50 < 15, f"p50 should be < 15ms under concurrency, got {p50:.2f}ms"
@@ -363,13 +342,8 @@ class TestDatabaseConcurrentPerformance:
 
             per_item_time = elapsed / batch_size
 
-            print(f"\nBulk insert (batch_size={batch_size}):")
-            print(f"  Total: {elapsed:.2f}ms")
-            print(f"  Per item: {per_item_time:.2f}ms")
 
             # Per-item time should be reasonable even for large batches
-            assert (
-                per_item_time < 5
-            ), f"Per-item time should be < 5ms, got {per_item_time:.2f}ms"
+            assert per_item_time < 5, f"Per-item time should be < 5ms, got {per_item_time:.2f}ms"
 
             await db_session.rollback()  # Clean up for next batch

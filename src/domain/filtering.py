@@ -7,7 +7,7 @@ The concrete FilterSet implementation lives in infrastructure, while the domain
 layer only depends on this protocol, following the Dependency Inversion Principle.
 """
 
-from typing import Any, ClassVar, Protocol
+from typing import ClassVar, Protocol
 
 from sqlalchemy import Select
 
@@ -27,18 +27,18 @@ class IFilterSet(Protocol):
     Example:
         ```python
         # Domain layer (interfaces.py)
-        async def find(self, filterset: IFilterSet, skip: int, limit: int) -> list[T]:
-            ...
+        async def find(self, filterset: IFilterSet, skip: int, limit: int) -> list[T]: ...
+
 
         # Infrastructure layer (filterset.py)
         class FilterSet(BaseModel):  # Conforms to IFilterSet protocol
-            def apply(self, query: Select) -> Select:
-                ...
+            def apply(self, query: Select) -> Select: ...
+
 
         # Usage
         class UserFilterSet(FilterSet):
             model = User
-            email: str | None = CharFilter(lookup='icontains')
+            email: str | None = CharFilter(lookup="icontains")
         ```
     """
 
@@ -104,4 +104,4 @@ class IFilterSet(Protocol):
 # Type alias for backward compatibility
 FilterSetProtocol = IFilterSet
 
-__all__ = ["IFilterSet", "FilterSetProtocol"]
+__all__ = ["FilterSetProtocol", "IFilterSet"]
