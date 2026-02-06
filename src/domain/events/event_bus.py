@@ -6,7 +6,7 @@ loose coupling between different parts of the system.
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from src.domain.events.base import DomainEvent
@@ -48,7 +48,9 @@ class EventBus:
         Args:
             track_history: Whether to keep history of published events
         """
-        self._handlers: dict[type[DomainEvent], list[Callable]] = defaultdict(list)
+        self._handlers: dict[type[DomainEvent], list[Callable[[DomainEvent], Awaitable[None]]]] = (
+            defaultdict(list)
+        )
         self._track_history = track_history
         self._event_history: list[DomainEvent] = []
 
@@ -62,7 +64,7 @@ class EventBus:
     def subscribe(
         self,
         event_type: type[DomainEvent],
-    ) -> Callable[[Callable], Callable]:
+    ) -> Callable[[Callable[[DomainEvent], Awaitable[None]]], Callable[[DomainEvent], Awaitable[None]]]:
         """Subscribe to a specific event type.
 
         Can be used as a decorator or function.
@@ -83,7 +85,9 @@ class EventBus:
             >>> bus.subscribe(UserCreatedEvent)(handler)
         """
 
-        def decorator(handler: Callable) -> Callable:
+        def decorator(
+            handler: Callable[[DomainEvent], Awaitable[None]],
+        ) -> Callable[[DomainEvent], Awaitable[None]]:
             self._handlers[event_type].append(handler)
             logger.info(
                 "event_handler_registered",
@@ -97,7 +101,7 @@ class EventBus:
     def unsubscribe(
         self,
         event_type: type[DomainEvent],
-        handler: Callable,
+        handler: Callable[[DomainEvent], Awaitable[None]],
     ) -> bool:
         """Unsubscribe a handler from an event type.
 
@@ -166,7 +170,7 @@ class EventBus:
 
     async def _call_handler(
         self,
-        handler: Callable,
+        handler: Callable[[DomainEvent], Awaitable[None]],
         event: DomainEvent,
     ) -> None:
         """Call a single event handler with error handling.
@@ -218,7 +222,10 @@ class EventBus:
             self._handlers.clear()
             logger.info("all_event_handlers_cleared")
 
-    def get_handlers(self, event_type: type[DomainEvent]) -> list[Callable]:
+    def get_handlers(
+        self,
+        event_type: type[DomainEvent],
+    ) -> list[Callable[[DomainEvent], Awaitable[None]]]:
         """Get all handlers for a specific event type.
 
         Args:

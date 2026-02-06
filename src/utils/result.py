@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import NoReturn, TypeVar
 
 
 T = TypeVar("T")  # Success type
@@ -162,7 +162,7 @@ class Err[E]:
         """Check if result is an error."""
         return True
 
-    def unwrap(self) -> T:
+    def unwrap(self) -> NoReturn:
         """Get the success value (raises for Err).
 
         Raises:
@@ -218,7 +218,7 @@ class Err[E]:
             >>> Err("failed").map(lambda x: x * 2)
             Err(error='failed')
         """
-        return self  # type: ignore
+        return self
 
     def map_err(self, f: Callable[[E], E]) -> Result[T, E]:
         """Transform the error value if Err.
@@ -248,7 +248,7 @@ class Err[E]:
             >>> Err("failed").and_then(lambda x: Ok(x * 2))
             Err(error='failed')
         """
-        return self  # type: ignore
+        return self
 
     def __repr__(self) -> str:
         """String representation."""
@@ -313,7 +313,7 @@ if __name__ == "__main__":
     value = divide(10, 0).unwrap_or(0.0)
 
     # Example 3: Chaining with map
-    result = divide(10, 2).map(lambda x: x * 2)
+    result = divide(10, 2).map(lambda x: x * 2)  # type: ignore[operator]
 
     # Example 4: Chaining with and_then
     def safe_sqrt(x: float) -> Result[float, str]:
