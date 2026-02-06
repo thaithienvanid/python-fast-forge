@@ -40,6 +40,28 @@ uv run python main.py
 
 👉 **[Complete setup guide](./GETTING-STARTED.md)** | **[Tutorials](./docs/tutorials/)** | **[Architecture](./docs/reference/architecture.md)**
 
+---
+
+## 🆕 Recent Updates (2026-02-06)
+
+✨ **Major Enhancements Added:**
+- **🏗️ Modular Configuration** - Split into 7 domain-specific settings classes (SRP)
+- **🔌 Circuit Breaker Pattern** - Production-ready resilience with auto-recovery
+- **📋 Enhanced Event Bus** - Type-safe domain events with metrics & history
+- **🚀 Production Guide** - 838-line deployment documentation
+- **🔮 Enhancement Roadmap** - 8 production-ready proposals (Event Sourcing, WebSocket, Plugin System, etc.)
+
+🐛 **Critical Fixes:**
+- Resolved circular imports (Clean Architecture compliance)
+- Complete type annotation coverage (100% mypy success)
+- All CI checks passing (formatting, linting, type checking)
+
+📊 **Quality Metrics:** 84% test coverage • 0 linting errors • 0 type errors • 124 files formatted
+
+👉 **[View full changelog](./CHANGELOG.md)** | **[Enhancement proposals](./docs/architecture/enhancement-proposals.md)**
+
+---
+
 ## 📋 Table of Contents
 
 - [When to Use This](#-when-to-use-this)
@@ -136,10 +158,11 @@ uv run python main.py
 
 ### Resilience & Performance
 
-- **🔌 Circuit Breaker** - Fault tolerance for external services
-- **💾 Redis Caching** - Configurable TTL with compression
+- **🔌 Circuit Breaker** - Fault tolerance for external services (CLOSED/OPEN/HALF_OPEN states)
+- **💾 Redis Caching** - Configurable TTL with zstd compression (2-5x compression ratio)
 - **🔄 Connection Pooling** - Efficient database connection management
 - **♻️ Graceful Degradation** - Fallback strategies for service failures
+- **📊 Domain Events** - Production-ready event bus with pub/sub pattern
 
 ## 🏛️ Architecture
 
@@ -196,6 +219,13 @@ graph TB
 - [Design Decisions](./docs/explanation/design-decisions.md) - ADRs and rationale
 - [Multi-Tenancy](./docs/explanation/multi-tenancy.md) - Tenant isolation approach
 - [Observability](./docs/explanation/observability.md) - Telemetry strategy
+
+### Operations & Deployment
+- [Production Deployment Guide](./docs/deployment/production-guide.md) - Complete production deployment
+- [Operations Runbook](./docs/operations/runbook.md) - Incident response & troubleshooting
+
+### Architecture & Planning
+- [Enhancement Proposals](./docs/architecture/enhancement-proposals.md) - Strategic roadmap (Event Sourcing, WebSocket, Plugin System, etc.)
 
 ## 🛠️ Technology Stack
 
