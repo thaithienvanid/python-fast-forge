@@ -6,21 +6,15 @@ entity-specific repositories.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.filtering import IFilterSet
 from src.domain.interfaces import IRepository
 from src.domain.models.base import BaseEntity
 from src.domain.pagination import Cursor, CursorPage, create_cursor_page
-
-
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
 
 
 class BaseRepository[T: BaseEntity](IRepository[T]):
@@ -322,7 +316,7 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
 
     async def find(
         self,
-        filterset: "FilterSet",
+        filterset: IFilterSet,
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
@@ -367,7 +361,7 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self, filterset: "FilterSet") -> int:
+    async def count(self, filterset: IFilterSet) -> int:
         """Count entities matching FilterSet criteria (generic counting support).
 
         Useful for implementing pagination UI that shows total count. Works with

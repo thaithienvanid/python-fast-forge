@@ -87,8 +87,11 @@ class Container(containers.DeclarativeContainer):
     # Caching can be toggled via CACHE_ENABLED environment variable
     # - CACHE_ENABLED=true  → Uses CachedUserRepository (Redis caching)
     # - CACHE_ENABLED=false → Uses UserRepository (direct DB, no cache)
-    # Note: For now, always use cached repository (it handles cache misses gracefully)
-    user_repository = user_repository_cached
+    user_repository = providers.Selector(
+        config.provided.cache_enabled,
+        true=user_repository_cached,
+        false=user_repository_base,
+    )
 
     # Session factory for Unit of Work
     session_factory_provider = providers.Callable(database.provided.get_session_factory)

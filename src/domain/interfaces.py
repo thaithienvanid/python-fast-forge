@@ -6,14 +6,9 @@ enable dependency inversion and facilitate testing with mock implementations.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
+from src.domain.filtering import IFilterSet
 
 
 class IRepository[T](ABC):
@@ -146,7 +141,7 @@ class IRepository[T](ABC):
     @abstractmethod
     async def find(
         self,
-        filterset: "FilterSet",
+        filterset: IFilterSet,
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
@@ -172,7 +167,7 @@ class IRepository[T](ABC):
         """
 
     @abstractmethod
-    async def count(self, filterset: "FilterSet") -> int:
+    async def count(self, filterset: IFilterSet) -> int:
         """Count total entities matching filter criteria without pagination.
 
         Useful for implementing pagination UI that shows total count.
@@ -220,4 +215,46 @@ class IUserRepository[T](IRepository[T]):
 
         Returns:
             User instance if found, None otherwise
+        """
+
+    @abstractmethod
+    async def find_by_emails(self, emails: list[str]) -> list[T]:
+        """Retrieve multiple users by their email addresses in a single query.
+
+        This method performs a bulk query to efficiently check for existing users
+        by email, avoiding N+1 query problems in batch operations.
+
+        Args:
+            emails: List of email addresses to search for (case-insensitive)
+
+        Returns:
+            List of user instances found (may be fewer than requested if some don't exist)
+
+        Example:
+            ```python
+            emails = ["user1@example.com", "user2@example.com"]
+            existing_users = await repository.find_by_emails(emails)
+            # Returns only users that exist in the database
+            ```
+        """
+
+    @abstractmethod
+    async def find_by_usernames(self, usernames: list[str]) -> list[T]:
+        """Retrieve multiple users by their usernames in a single query.
+
+        This method performs a bulk query to efficiently check for existing users
+        by username, avoiding N+1 query problems in batch operations.
+
+        Args:
+            usernames: List of usernames to search for
+
+        Returns:
+            List of user instances found (may be fewer than requested if some don't exist)
+
+        Example:
+            ```python
+            usernames = ["user1", "user2"]
+            existing_users = await repository.find_by_usernames(usernames)
+            # Returns only users that exist in the database
+            ```
         """

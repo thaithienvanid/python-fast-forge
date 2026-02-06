@@ -3,8 +3,8 @@
 from typing import Annotated
 from uuid import UUID
 
-from authlib.jose import JoseError
 from fastapi import Depends, Header, HTTPException, status
+from jose import JWTError
 from pydantic import ValidationError
 from structlog import get_logger
 
@@ -75,7 +75,7 @@ async def get_tenant_id(
             )
             return tenant_id
 
-        except JoseError as e:
+        except JWTError as e:
             # Handle JWT-specific errors
             error_msg = str(e).lower()
 

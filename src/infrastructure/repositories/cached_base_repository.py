@@ -6,18 +6,12 @@ duplication across entity-specific cached repositories.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from src.domain.filtering import IFilterSet
 from src.domain.interfaces import IRepository
 from src.domain.models.base import BaseEntity
 from src.infrastructure.cache.redis_cache import RedisCache
-
-
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
 
 
 class CachedBaseRepository[T: BaseEntity](IRepository[T], ABC):
@@ -428,7 +422,7 @@ class CachedBaseRepository[T: BaseEntity](IRepository[T], ABC):
 
     async def find(
         self,
-        filterset: "FilterSet",
+        filterset: IFilterSet,
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
@@ -456,7 +450,7 @@ class CachedBaseRepository[T: BaseEntity](IRepository[T], ABC):
             limit=limit,
         )
 
-    async def count(self, filterset: "FilterSet") -> int:
+    async def count(self, filterset: IFilterSet) -> int:
         """Count entities matching FilterSet criteria (not cached).
 
         Count operations are not cached as they can change frequently
