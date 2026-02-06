@@ -3,7 +3,6 @@
 Tests the cache-specific error types used with Result.
 """
 
-
 from src.infrastructure.cache.errors import (
     CacheCompressionError,
     CacheConnectionError,

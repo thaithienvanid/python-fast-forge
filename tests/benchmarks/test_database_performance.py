@@ -59,7 +59,6 @@ class TestDatabaseReadPerformance:
         p50 = median(times)
         p95, p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
 
-
         # Assert performance targets
         assert p50 < 5, f"p50 should be < 5ms, got {p50:.2f}ms"
         assert p95 < 10, f"p95 should be < 10ms, got {p95:.2f}ms"
@@ -98,7 +97,6 @@ class TestDatabaseReadPerformance:
         # Calculate percentiles
         p50 = median(times)
         p95 = quantiles(times, n=100)[94]
-
 
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
@@ -143,7 +141,6 @@ class TestDatabaseReadPerformance:
             median(times)
             p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-
             # Performance should scale reasonably with batch size
             expected_p95 = 20 + (batch_size / 10) * 5  # ~20ms + 5ms per 10 items
             assert p95 < expected_p95, (
@@ -182,7 +179,6 @@ class TestDatabaseWritePerformance:
         # Calculate percentiles
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
-
 
         assert p50 < 10, f"p50 should be < 10ms, got {p50:.2f}ms"
         assert p95 < 20, f"p95 should be < 20ms, got {p95:.2f}ms"
@@ -223,7 +219,6 @@ class TestDatabaseWritePerformance:
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
 
-
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
 
@@ -260,7 +255,6 @@ class TestDatabaseWritePerformance:
         # Calculate percentiles
         p50 = median(times)
         p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
-
 
         assert p50 < 8, f"p50 should be < 8ms, got {p50:.2f}ms"
         assert p95 < 15, f"p95 should be < 15ms, got {p95:.2f}ms"
@@ -310,7 +304,6 @@ class TestDatabaseConcurrentPerformance:
         p50 = median(all_times)
         p95 = quantiles(all_times, n=100)[94]
 
-
         # Under concurrency, allow slightly higher latency
         assert p50 < 15, f"p50 should be < 15ms under concurrency, got {p50:.2f}ms"
         assert p95 < 30, f"p95 should be < 30ms under concurrency, got {p95:.2f}ms"
@@ -341,7 +334,6 @@ class TestDatabaseConcurrentPerformance:
             elapsed = (time.perf_counter() - start) * 1000
 
             per_item_time = elapsed / batch_size
-
 
             # Per-item time should be reasonable even for large batches
             assert per_item_time < 5, f"Per-item time should be < 5ms, got {per_item_time:.2f}ms"
