@@ -1,5 +1,5 @@
 -- Add Event Sourcing tables for CQRS pattern
--- This migration adds the event store and snapshot tables required for event sourcing
+-- This migration adds the event store, snapshot tables, and projection checkpoints required for event sourcing
 
 -- Create "event_store" table
 CREATE TABLE "event_store" (
@@ -54,3 +54,16 @@ COMMENT ON COLUMN "event_store_snapshots"."aggregate_id" IS 'Aggregate instance 
 COMMENT ON COLUMN "event_store_snapshots"."aggregate_version" IS 'Aggregate version when snapshot was taken';
 COMMENT ON COLUMN "event_store_snapshots"."snapshot_data" IS 'Full aggregate state as JSON';
 COMMENT ON COLUMN "event_store_snapshots"."created_at" IS 'When this snapshot was created';
+
+-- Create "projection_checkpoints" table
+CREATE TABLE "projection_checkpoints" (
+  "projection_name" character varying(100) NOT NULL,
+  "last_event_timestamp" timestamptz NOT NULL,
+  "updated_at" timestamptz NOT NULL,
+  PRIMARY KEY ("projection_name")
+);
+
+-- Set comments on projection_checkpoints columns
+COMMENT ON COLUMN "projection_checkpoints"."projection_name" IS 'Unique projection identifier';
+COMMENT ON COLUMN "projection_checkpoints"."last_event_timestamp" IS 'Last processed event timestamp';
+COMMENT ON COLUMN "projection_checkpoints"."updated_at" IS 'When checkpoint was last updated';

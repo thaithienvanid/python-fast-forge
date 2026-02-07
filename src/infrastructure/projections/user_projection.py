@@ -80,8 +80,37 @@ class ProjectionCheckpoint:
         Returns:
             Last processed event timestamp (or epoch if no checkpoint)
         """
-        # TODO: Load from checkpoint table
-        # For now, start from epoch
+        from sqlalchemy import text
+
+        # Load checkpoint from database using raw SQL
+        # This avoids needing a separate ORM model
+        result = await session.execute(
+            text(
+                """
+                SELECT last_event_timestamp
+                FROM projection_checkpoints
+                WHERE projection_name = :name
+                """
+            ),
+            {"name": self.projection_name},
+        )
+        row = result.first()
+
+        if row and row[0]:
+            self.last_event_timestamp = row[0]
+            logger.info(
+                "checkpoint_loaded",
+                projection=self.projection_name,
+                timestamp=row[0].isoformat(),
+            )
+            return row[0]
+
+        # No checkpoint found, start from epoch
+        logger.info(
+            "checkpoint_not_found",
+            projection=self.projection_name,
+            message="Starting from beginning",
+        )
         return datetime.min.replace(tzinfo=UTC)
 
     async def save(self, session: AsyncSession, timestamp: datetime) -> None:
@@ -91,8 +120,31 @@ class ProjectionCheckpoint:
             session: Database session
             timestamp: Event timestamp to checkpoint
         """
+        from sqlalchemy import text
+
         self.last_event_timestamp = timestamp
-        # TODO: Save to checkpoint table
+
+        # Upsert checkpoint using raw SQL (PostgreSQL syntax)
+        await session.execute(
+            text(
+                """
+                INSERT INTO projection_checkpoints (projection_name, last_event_timestamp, updated_at)
+                VALUES (:name, :timestamp, :updated_at)
+                ON CONFLICT (projection_name)
+                DO UPDATE SET
+                    last_event_timestamp = :timestamp,
+                    updated_at = :updated_at
+                """
+            ),
+            {
+                "name": self.projection_name,
+                "timestamp": timestamp,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+
+        await session.commit()
+
         logger.debug(
             "checkpoint_saved",
             projection=self.projection_name,

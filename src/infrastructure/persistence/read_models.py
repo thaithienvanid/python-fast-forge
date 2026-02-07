@@ -23,7 +23,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-from src.infrastructure.persistence.database import Base
+from src.domain.models.base import Base
 
 
 class UserReadModel(Base):
@@ -149,20 +149,17 @@ class UserReadModel(Base):
             "ix_user_read_model_tenant_active",
             "tenant_id",
             "is_active",
-            comment="Index for tenant + active status queries",
         ),
         # Index for time-based queries
         Index(
             "ix_user_read_model_created_at",
             "created_at",
-            comment="Index for time-based sorting/filtering",
         ),
-        # Partial index for active users (most common query)
+        # Partial index for active users (most common query - deleted_at IS NULL)
         Index(
             "ix_user_read_model_active_users",
             "id",
             postgresql_where=(deleted_at.is_(None)),
-            comment="Partial index for active users (deleted_at IS NULL)",
         ),
     )
 

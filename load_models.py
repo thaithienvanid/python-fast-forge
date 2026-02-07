@@ -28,5 +28,7 @@ if __name__ == "__main__":
             # Event sourcing models
             EventStoreEntry,
             EventStoreSnapshot,
+            # Note: projection_checkpoints table created via migration
+            # (uses raw SQL in ProjectionCheckpoint class)
         ],
     )
