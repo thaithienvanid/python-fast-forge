@@ -380,15 +380,33 @@ class S3StoragePlugin(StoragePlugin):
         self._endpoint_url = context.config.get("endpoint_url")
         self._public_url_base = context.config.get("public_url_base")
 
-        # TODO: Initialize boto3 S3 client
-        # import boto3
-        # self._client = boto3.client(
-        #     "s3",
-        #     region_name=self._region,
-        #     aws_access_key_id=self._access_key_id,
-        #     aws_secret_access_key=self._secret_access_key,
-        #     endpoint_url=self._endpoint_url,
-        # )
+        # Initialize boto3 S3 client
+        try:
+            import boto3
+
+            self._client = boto3.client(
+                "s3",
+                region_name=self._region,
+                aws_access_key_id=self._access_key_id,
+                aws_secret_access_key=self._secret_access_key,
+                endpoint_url=self._endpoint_url,
+            )
+            self._s3_available = True
+
+            if context.logger:
+                context.logger.info(
+                    "s3_plugin_initialized",
+                    bucket=self._bucket,
+                    region=self._region,
+                )
+        except ImportError:
+            if context.logger:
+                context.logger.warning(
+                    "s3_not_available",
+                    message="boto3 not installed. Install with: pip install boto3",
+                )
+            self._client = None
+            self._s3_available = False
 
     async def validate(self) -> bool:
         """Validate S3 configuration."""
@@ -403,46 +421,151 @@ class S3StoragePlugin(StoragePlugin):
         metadata: dict[str, str] | None = None,
     ) -> str:
         """Upload file to S3."""
-        # TODO: Implement S3 upload
-        # self._client.put_object(
-        #     Bucket=self._bucket,
-        #     Key=path,
-        #     Body=content,
-        #     ContentType=content_type,
-        #     Metadata=metadata or {},
-        # )
+        # Check if S3 is available
+        if not self._s3_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "s3_unavailable",
+                    message="S3 client not available, upload skipped",
+                    path=path,
+                )
+            return path
 
-        if self.context and self.context.logger:
-            self.context.logger.info("s3_file_uploaded", path=path, bucket=self._bucket)
+        try:
+            # Build put_object parameters
+            put_params = {
+                "Bucket": self._bucket,
+                "Key": path,
+                "Body": content,
+            }
 
-        return path
+            if content_type:
+                put_params["ContentType"] = content_type
+
+            if metadata:
+                put_params["Metadata"] = metadata
+
+            # Upload to S3
+            self._client.put_object(**put_params)
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "s3_file_uploaded",
+                    path=path,
+                    bucket=self._bucket,
+                    size=len(content) if isinstance(content, bytes) else None,
+                )
+
+            return path
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "s3_upload_failed",
+                    path=path,
+                    bucket=self._bucket,
+                    error=str(e),
+                )
+            raise
 
     async def download(self, path: str) -> bytes:
         """Download file from S3."""
-        # TODO: Implement S3 download
-        # response = self._client.get_object(Bucket=self._bucket, Key=path)
-        # return response["Body"].read()
+        # Check if S3 is available
+        if not self._s3_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "s3_unavailable",
+                    message="S3 client not available, returning empty bytes",
+                    path=path,
+                )
+            return b""
 
-        return b""
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=path)
+            content = response["Body"].read()
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "s3_file_downloaded",
+                    path=path,
+                    bucket=self._bucket,
+                    size=len(content),
+                )
+
+            return content
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "s3_download_failed",
+                    path=path,
+                    bucket=self._bucket,
+                    error=str(e),
+                )
+            raise
 
     async def delete(self, path: str) -> None:
         """Delete file from S3."""
-        # TODO: Implement S3 delete
-        # self._client.delete_object(Bucket=self._bucket, Key=path)
+        # Check if S3 is available
+        if not self._s3_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "s3_unavailable",
+                    message="S3 client not available, delete skipped",
+                    path=path,
+                )
+            return
 
-        if self.context and self.context.logger:
-            self.context.logger.info("s3_file_deleted", path=path, bucket=self._bucket)
+        try:
+            self._client.delete_object(Bucket=self._bucket, Key=path)
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "s3_file_deleted",
+                    path=path,
+                    bucket=self._bucket,
+                )
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "s3_delete_failed",
+                    path=path,
+                    bucket=self._bucket,
+                    error=str(e),
+                )
+            raise
 
     async def exists(self, path: str) -> bool:
         """Check if file exists in S3."""
-        # TODO: Implement S3 exists check
-        # try:
-        #     self._client.head_object(Bucket=self._bucket, Key=path)
-        #     return True
-        # except ClientError:
-        #     return False
+        # Check if S3 is available
+        if not self._s3_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "s3_unavailable",
+                    message="S3 client not available, returning False",
+                    path=path,
+                )
+            return False
 
-        return False
+        try:
+            from botocore.exceptions import ClientError
+
+            self._client.head_object(Bucket=self._bucket, Key=path)
+            return True
+
+        except ClientError:
+            return False
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "s3_exists_check_failed",
+                    path=path,
+                    bucket=self._bucket,
+                    error=str(e),
+                )
+            return False
 
     async def get_url(
         self,
@@ -454,15 +577,34 @@ class S3StoragePlugin(StoragePlugin):
         if public and self._public_url_base:
             return f"{self._public_url_base.rstrip('/')}/{path}"
 
-        # TODO: Generate signed URL
-        # if expires_in:
-        #     url = self._client.generate_presigned_url(
-        #         "get_object",
-        #         Params={"Bucket": self._bucket, "Key": path},
-        #         ExpiresIn=expires_in,
-        #     )
-        #     return url
+        # Generate signed URL if expires_in is provided
+        if expires_in and self._s3_available and self._client:
+            try:
+                url = self._client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": self._bucket, "Key": path},
+                    ExpiresIn=expires_in,
+                )
 
+                if self.context and self.context.logger:
+                    self.context.logger.debug(
+                        "s3_presigned_url_generated",
+                        path=path,
+                        expires_in=expires_in,
+                    )
+
+                return url
+
+            except Exception as e:
+                if self.context and self.context.logger:
+                    self.context.logger.error(
+                        "s3_presigned_url_failed",
+                        path=path,
+                        error=str(e),
+                    )
+                # Fall through to default URL
+
+        # Default public URL
         return f"https://{self._bucket}.s3.{self._region}.amazonaws.com/{path}"
 
     async def list_files(
@@ -471,23 +613,49 @@ class S3StoragePlugin(StoragePlugin):
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         """List files in S3 bucket."""
-        # TODO: Implement S3 list
-        # response = self._client.list_objects_v2(
-        #     Bucket=self._bucket,
-        #     Prefix=prefix,
-        #     MaxKeys=limit or 1000,
-        # )
-        #
-        # files = []
-        # for obj in response.get("Contents", []):
-        #     files.append({
-        #         "path": obj["Key"],
-        #         "size": obj["Size"],
-        #         "modified_at": obj["LastModified"],
-        #     })
-        # return files
+        # Check if S3 is available
+        if not self._s3_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "s3_unavailable",
+                    message="S3 client not available, returning empty list",
+                )
+            return []
 
-        return []
+        try:
+            response = self._client.list_objects_v2(
+                Bucket=self._bucket,
+                Prefix=prefix,
+                MaxKeys=limit or 1000,
+            )
+
+            files = []
+            for obj in response.get("Contents", []):
+                files.append({
+                    "path": obj["Key"],
+                    "size": obj["Size"],
+                    "modified_at": obj["LastModified"],
+                })
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "s3_files_listed",
+                    bucket=self._bucket,
+                    prefix=prefix,
+                    count=len(files),
+                )
+
+            return files
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "s3_list_failed",
+                    bucket=self._bucket,
+                    prefix=prefix,
+                    error=str(e),
+                )
+            raise
 
 
 __all__ = [
