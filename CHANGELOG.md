@@ -129,9 +129,88 @@ This template uses **uv** (not pip) for dependency management:
 
 When you start your project from this template, document your changes below:
 
-## [Unreleased] - 2026-02-06
+## [Unreleased] - 2026-02-07
 
 ### Added - Major Features 🚀
+
+#### 🎯 Event Sourcing & CQRS Implementation (Phase 1)
+- **Event Store**: Append-only immutable event log with JSONB storage
+  - Optimistic locking with aggregate versioning
+  - Snapshot support for performance optimization
+  - Automatic event replay and aggregate reconstruction
+  - Location: `src/infrastructure/persistence/event_store_models.py` (264 lines)
+  - Location: `src/infrastructure/repositories/event_store_repository.py` (344 lines)
+
+- **Event Registry**: Type-safe event deserialization pattern
+  - Auto-registration of domain events
+  - Factory pattern for event reconstruction
+  - Location: `src/domain/events/__init__.py` (enhanced)
+
+- **CQRS Pattern**: Complete Command/Query Separation
+  - Command models with validation and metadata (196 lines)
+  - Command handlers for write operations (476 lines)
+  - Query models with denormalized data (176 lines)
+  - Query handlers for read operations (329 lines)
+  - Read models optimized for fast queries (167 lines)
+  - Location: `src/app/commands/`, `src/app/command_handlers/`, `src/app/queries/`, `src/app/query_handlers/`
+
+- **Projection Workers**: Eventually consistent read models
+  - Checkpoint-based resumption
+  - Batch processing (100 events at a time)
+  - Full rebuild capability from event history
+  - Location: `src/infrastructure/projections/user_projection.py` (476 lines)
+
+#### 🌐 Real-Time Streaming (Phase 2)
+- **WebSocket Support**: Bidirectional real-time communication
+  - Connection lifecycle management
+  - Room-based broadcasting
+  - Redis pub/sub for multi-instance support
+  - User and tenant channel subscriptions
+  - Location: `src/infrastructure/realtime/websocket_manager.py` (339 lines)
+  - Location: `src/presentation/api/v1/endpoints/websocket.py` (165 lines)
+
+- **Server-Sent Events (SSE)**: Unidirectional server→client streaming
+  - Automatic reconnection (browser-native)
+  - Heartbeat every 30 seconds
+  - SSEPublisher for backend services
+  - Location: `src/presentation/api/v1/endpoints/sse.py` (296 lines)
+
+#### 🔌 Plugin System (Phase 3)
+- **Plugin Framework**: Extensible architecture following Open/Closed Principle
+  - Plugin base with lifecycle management (init → validate → activate → deactivate)
+  - Plugin manager with auto-discovery and dependency resolution
+  - Type-safe interfaces with Protocol pattern
+  - Hot-reload capability
+  - Location: `src/infrastructure/plugins/base.py` (393 lines)
+  - Location: `src/infrastructure/plugins/manager.py` (596 lines)
+
+- **Built-in Plugin Types**:
+  - **Email Plugins**: SMTP and SendGrid implementations (455 lines)
+  - **Storage Plugins**: Local filesystem and S3 implementations (440 lines)
+  - **Auth Plugins**: JWT and OAuth2 implementations (405 lines)
+  - Location: `src/infrastructure/plugins/builtin/`
+
+#### 📬 Message Queue & Job Scheduler (Phase 4)
+- **Message Queue Abstraction**: Backend-agnostic async task processing
+  - Priority-based processing (LOW, NORMAL, HIGH, URGENT)
+  - Delayed message delivery
+  - Automatic retry with configurable limits
+  - Dead letter queue for failed messages
+  - Publisher/subscriber pattern with decorators
+  - Location: `src/infrastructure/messaging/queue.py` (366 lines)
+
+- **Queue Implementations**:
+  - **RabbitMQ**: AMQP-based with dead letter exchanges (321 lines)
+  - **Redis**: Lightweight with sorted sets for delays (396 lines)
+  - Location: `src/infrastructure/messaging/rabbitmq.py`, `src/infrastructure/messaging/redis_queue.py`
+
+- **Job Scheduler**: CRON and interval-based task execution
+  - CRON expression parsing (e.g., "0 0 * * *")
+  - Timezone support
+  - Distributed locking to prevent duplicate execution
+  - Automatic error handling and job disabling
+  - Manual job triggering
+  - Location: `src/infrastructure/messaging/scheduler.py` (644 lines)
 
 #### 🏗️ Modular Configuration System
 - **Settings Refactoring**: Split monolithic config into 7 domain-specific classes (Single Responsibility Principle)
@@ -243,7 +322,12 @@ from src.domain.filtering import IFilterSet  # Use protocol for interfaces
 
 ## Code Quality Metrics
 
-- **Total Lines**: ~10,500 lines of Python
+- **Total Lines**: ~17,500 lines of Python (+7,000 new lines)
+- **New Features**: 7,136 lines across 4 major phases
+  - Phase 1 (Event Sourcing & CQRS): 2,048 lines
+  - Phase 2 (Real-Time Streaming): 1,029 lines
+  - Phase 3 (Plugin System): 2,380 lines
+  - Phase 4 (Message Queue): 1,727 lines
 - **Test Coverage**: 84% (1,069 tests)
 - **Type Coverage**: 100% (83 files, 0 mypy errors)
 - **Linting**: 0 errors, 0 warnings
