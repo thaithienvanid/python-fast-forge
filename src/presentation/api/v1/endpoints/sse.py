@@ -56,51 +56,82 @@ import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from authlib.jose import JoseError
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from redis.asyncio import Redis
 from sse_starlette.sse import EventSourceResponse
 
+from src.infrastructure.config import get_settings
 from src.infrastructure.logging.config import get_logger
+from src.utils.tenant_auth import decode_tenant_token
 
 logger = get_logger(__name__)
 router = APIRouter()
 
+# Global Redis connection pool for SSE
+_redis_pool: Redis | None = None
 
-# Placeholder for dependencies
-# TODO: Replace with actual DI container injection
+
 async def get_redis_client() -> Redis:
-    """Get Redis client for pub/sub."""
-    return Redis.from_url("redis://localhost:6379")
+    """Get Redis client for pub/sub.
+
+    Returns:
+        Redis connection instance
+    """
+    global _redis_pool
+    if _redis_pool is None:
+        settings = get_settings()
+        _redis_pool = Redis.from_url(
+            settings.redis_url,
+            max_connections=settings.cache.redis_max_connections,
+            decode_responses=False,  # SSE manages encoding
+        )
+    return _redis_pool
 
 
-async def get_current_user_id(token: str) -> UUID:
-    """Get authenticated user ID from JWT token.
+async def authenticate_sse(token: str) -> tuple[UUID, UUID]:
+    """Authenticate SSE connection via JWT token.
 
     Args:
         token: JWT token string
 
     Returns:
-        User ID
+        Tuple of (user_id, tenant_id) extracted from token
 
-    TODO: Implement actual JWT validation
+    Raises:
+        HTTPException: If authentication fails
     """
-    # TODO: Implement JWT validation
-    return UUID("00000000-0000-0000-0000-000000000001")
+    try:
+        # Decode and validate JWT token using authlib
+        claims = decode_tenant_token(token)
 
+        # Extract user_id from subject claim
+        user_id = UUID(claims.sub) if claims.sub else None
+        if not user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid token: missing user ID",
+            )
 
-async def get_tenant_id(token: str) -> UUID:
-    """Get tenant ID from JWT token.
+        tenant_id = claims.tenant_id
 
-    Args:
-        token: JWT token string
+        logger.info(
+            "sse_authenticated",
+            user_id=str(user_id),
+            tenant_id=str(tenant_id),
+        )
 
-    Returns:
-        Tenant ID
+        return user_id, tenant_id
 
-    TODO: Implement actual JWT/tenant validation
-    """
-    # TODO: Implement tenant ID extraction
-    return UUID("00000000-0000-0000-0000-000000000002")
+    except (JoseError, ValueError) as e:
+        logger.warning(
+            "sse_authentication_failed",
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=401,
+            detail=f"Authentication failed: {str(e)}",
+        )
 
 
 @router.get("/stream")
@@ -145,8 +176,7 @@ async def sse_stream(
         ```
     """
     # Authenticate user
-    user_id = await get_current_user_id(token)
-    tenant_id = await get_tenant_id(token)
+    user_id, tenant_id = await authenticate_sse(token)
 
     logger.info(
         "sse_connected",
