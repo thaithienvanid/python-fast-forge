@@ -33,7 +33,6 @@ Example:
     >>> is_encrypted = await iso.verify_encryption(data=sensitive_data)
 """
 
-import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from enum import Enum
@@ -42,6 +41,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from src.infrastructure.logging.config import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -297,7 +297,9 @@ class ISO27001Compliance:
             user_id=user_id,
             role=role,
             resource=resource,
-            access_level=access_level if isinstance(access_level, AccessLevel) else AccessLevel(access_level),
+            access_level=access_level
+            if isinstance(access_level, AccessLevel)
+            else AccessLevel(access_level),
             valid_from=timestamp,
             valid_until=valid_until,
             conditions=conditions,
@@ -386,7 +388,9 @@ class ISO27001Compliance:
 
         # Log access attempt
         await self.log_security_event(
-            event_type=SecurityEventType.ACCESS_GRANTED if granted else SecurityEventType.ACCESS_DENIED,
+            event_type=SecurityEventType.ACCESS_GRANTED
+            if granted
+            else SecurityEventType.ACCESS_DENIED,
             user_id=user_id,
             resource=resource,
             success=granted,
@@ -476,7 +480,8 @@ class ISO27001Compliance:
 
             # Check for brute force (5 failures in 5 minutes)
             recent_failures = [
-                ts for ts in self._failed_logins[user_id]
+                ts
+                for ts in self._failed_logins[user_id]
                 if ts > datetime.now(UTC) - timedelta(minutes=5)
             ]
 
@@ -634,11 +639,11 @@ class ISO27001Compliance:
 
 
 __all__ = [
+    "AccessControlRule",
+    "AccessLevel",
+    "ControlCategory",
+    "CryptographicControl",
     "ISO27001Compliance",
     "SecurityEvent",
-    "AccessControlRule",
-    "CryptographicControl",
-    "ControlCategory",
     "SecurityEventType",
-    "AccessLevel",
 ]

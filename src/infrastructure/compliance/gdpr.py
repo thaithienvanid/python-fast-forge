@@ -46,9 +46,10 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from src.infrastructure.logging.config import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -326,9 +327,7 @@ class GDPRCompliance:
 
         # Find most recent consent for this purpose
         relevant_consents = [
-            c
-            for c in self._consent_records
-            if c.user_id == user_id and c.purpose == purpose
+            c for c in self._consent_records if c.user_id == user_id and c.purpose == purpose
         ]
 
         if not relevant_consents:
@@ -338,9 +337,8 @@ class GDPRCompliance:
         latest_consent = max(relevant_consents, key=lambda c: c.timestamp)
 
         # Check if consent is given and not expired
-        is_valid = (
-            latest_consent.consent_given
-            and (latest_consent.expires_at is None or latest_consent.expires_at > now)
+        is_valid = latest_consent.consent_given and (
+            latest_consent.expires_at is None or latest_consent.expires_at > now
         )
 
         return is_valid
@@ -374,9 +372,7 @@ class GDPRCompliance:
             "data_collected_at": datetime.now(UTC).isoformat(),
             "stored_data": self._data_store.get(user_id, {}),
             "consent_records": [
-                c.model_dump()
-                for c in self._consent_records
-                if c.user_id == user_id
+                c.model_dump() for c in self._consent_records if c.user_id == user_id
             ],
             "processing_purposes": list(
                 {c.purpose for c in self._consent_records if c.user_id == user_id}
@@ -511,14 +507,13 @@ class GDPRCompliance:
                 raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
             return json.dumps(data, indent=2, default=default_serializer)
-        elif format == "csv":
+        if format == "csv":
             # Simplified CSV export
             return "CSV export not fully implemented"
-        elif format == "xml":
+        if format == "xml":
             # Simplified XML export
             return "XML export not fully implemented"
-        else:
-            return data
+        return data
 
     async def record_processing_activity(
         self,
@@ -657,10 +652,13 @@ class GDPRCompliance:
             >>> report = await gdpr.generate_compliance_report()
         """
         total_consents = len(self._consent_records)
-        active_consents = len([
-            c for c in self._consent_records
-            if c.consent_given and (c.expires_at is None or c.expires_at > datetime.now(UTC))
-        ])
+        active_consents = len(
+            [
+                c
+                for c in self._consent_records
+                if c.consent_given and (c.expires_at is None or c.expires_at > datetime.now(UTC))
+            ]
+        )
 
         report = {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -669,10 +667,13 @@ class GDPRCompliance:
             "consent_rate": active_consents / total_consents if total_consents > 0 else 0,
             "processing_activities": len(self._processing_records),
             "data_breaches": len(self._breach_records),
-            "high_severity_breaches": len([
-                b for b in self._breach_records
-                if b.severity in [BreachSeverity.HIGH, BreachSeverity.CRITICAL]
-            ]),
+            "high_severity_breaches": len(
+                [
+                    b
+                    for b in self._breach_records
+                    if b.severity in [BreachSeverity.HIGH, BreachSeverity.CRITICAL]
+                ]
+            ),
         }
 
         logger.info("gdpr_compliance_report_generated", report=report)
@@ -681,12 +682,12 @@ class GDPRCompliance:
 
 
 __all__ = [
-    "GDPRCompliance",
-    "ConsentRecord",
-    "DataProcessingRecord",
-    "DataBreachRecord",
-    "ProcessingPurpose",
-    "DataCategory",
-    "DataSubjectRight",
     "BreachSeverity",
+    "ConsentRecord",
+    "DataBreachRecord",
+    "DataCategory",
+    "DataProcessingRecord",
+    "DataSubjectRight",
+    "GDPRCompliance",
+    "ProcessingPurpose",
 ]

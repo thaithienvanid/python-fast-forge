@@ -37,7 +37,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Protocol
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -92,10 +91,10 @@ class PluginMetadata(BaseModel):
         ...         "type": "object",
         ...         "properties": {
         ...             "api_key": {"type": "string"},
-        ...             "from_email": {"type": "string", "format": "email"}
+        ...             "from_email": {"type": "string", "format": "email"},
         ...         },
-        ...         "required": ["api_key"]
-        ...     }
+        ...         "required": ["api_key"],
+        ...     },
         ... )
     """
 
@@ -212,7 +211,6 @@ class Plugin(ABC):
         Returns:
             Plugin metadata with name, version, type, etc.
         """
-        pass
 
     @abstractmethod
     async def init(self, context: PluginContext) -> None:
@@ -227,7 +225,6 @@ class Plugin(ABC):
         Raises:
             Exception: If initialization fails
         """
-        pass
 
     @abstractmethod
     async def validate(self) -> bool:
@@ -247,7 +244,6 @@ class Plugin(ABC):
             ...     # Test connection
             ...     return await self._client.test_connection()
         """
-        pass
 
     async def activate(self) -> None:
         """Activate plugin.
@@ -264,7 +260,6 @@ class Plugin(ABC):
             ...     # Subscribe to events
             ...     self.context.event_bus.subscribe("user.created", self._on_user_created)
         """
-        pass
 
     async def deactivate(self) -> None:
         """Deactivate plugin.
@@ -281,7 +276,6 @@ class Plugin(ABC):
             ...     # Close connections
             ...     await self._client.close()
         """
-        pass
 
     async def health_check(self) -> dict[str, Any]:
         """Check plugin health.
@@ -316,17 +310,10 @@ class PluginInterface(Protocol):
 
     Example:
         >>> class EmailPlugin(PluginInterface):
-        ...     async def send_email(
-        ...         self, to: str, subject: str, body: str
-        ...     ) -> None:
-        ...         ...
-        ...
+        ...     async def send_email(self, to: str, subject: str, body: str) -> None: ...
         >>> class SendGridEmailPlugin(Plugin):
-        ...     async def send_email(
-        ...         self, to: str, subject: str, body: str
-        ...     ) -> None:
+        ...     async def send_email(self, to: str, subject: str, body: str) -> None:
         ...         await self._client.send(to, subject, body)
-        ...
         >>> # Type checker knows SendGridEmailPlugin implements EmailPlugin
         >>> plugin: EmailPlugin = SendGridEmailPlugin()
     """
@@ -371,9 +358,9 @@ class PluginLoadError(Exception):
 
 __all__ = [
     "Plugin",
-    "PluginMetadata",
     "PluginContext",
-    "PluginStatus",
     "PluginInterface",
     "PluginLoadError",
+    "PluginMetadata",
+    "PluginStatus",
 ]

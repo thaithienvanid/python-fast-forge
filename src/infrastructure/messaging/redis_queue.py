@@ -35,6 +35,7 @@ from redis.asyncio import Redis
 from src.infrastructure.logging.config import get_logger
 from src.infrastructure.messaging.queue import Message, MessagePriority, MessageQueue
 
+
 logger = get_logger(__name__)
 
 
@@ -200,8 +201,7 @@ class RedisQueue(MessageQueue):
 
         Example:
             >>> @queue.subscribe("tasks.email")
-            >>> async def email_handler(message):
-            ...     ...
+            >>> async def email_handler(message): ...
             >>>
             >>> await queue.start_consuming()  # Blocks
         """

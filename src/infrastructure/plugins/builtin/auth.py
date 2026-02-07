@@ -21,8 +21,6 @@ Example:
     >>> user_id = await plugin.verify_token(token)
 """
 
-import hashlib
-import hmac
 from abc import abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -64,13 +62,14 @@ class AuthPlugin(Plugin):
             AuthenticationError: If authentication fails
 
         Example:
-            >>> user = await plugin.authenticate({
-            ...     "username": "john",
-            ...     "password": "secret123",
-            ... })
+            >>> user = await plugin.authenticate(
+            ...     {
+            ...         "username": "john",
+            ...         "password": "secret123",
+            ...     }
+            ... )
             >>> print(user["user_id"])
         """
-        pass
 
     @abstractmethod
     async def create_token(
@@ -96,7 +95,6 @@ class AuthPlugin(Plugin):
             ...     expires_in=3600,
             ... )
         """
-        pass
 
     @abstractmethod
     async def verify_token(self, token: str) -> dict[str, Any]:
@@ -115,7 +113,6 @@ class AuthPlugin(Plugin):
             >>> claims = await plugin.verify_token(token)
             >>> user_id = claims["user_id"]
         """
-        pass
 
     async def refresh_token(
         self,
@@ -144,7 +141,6 @@ class AuthPlugin(Plugin):
             >>> await plugin.revoke_token(token)
         """
         # Default: no-op (tokens expire naturally)
-        pass
 
 
 class JWTAuthPlugin(AuthPlugin):
@@ -161,11 +157,13 @@ class JWTAuthPlugin(AuthPlugin):
         audience: Token audience claim (optional)
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "secret_key": "your-secret-key-here",
-        ...     "algorithm": "HS256",
-        ...     "access_token_expires": 3600,
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "secret_key": "your-secret-key-here",
+        ...         "algorithm": "HS256",
+        ...         "access_token_expires": 3600,
+        ...     }
+        ... )
         >>> plugin = JWTAuthPlugin()
         >>> await plugin.init(context)
     """
@@ -382,9 +380,7 @@ class JWTAuthPlugin(AuthPlugin):
 
         # Create new tokens
         new_access_token = await self.create_token(user_id)
-        new_refresh_token = await self.create_token(
-            user_id, expires_in=self._refresh_token_expires
-        )
+        new_refresh_token = await self.create_token(user_id, expires_in=self._refresh_token_expires)
 
         return new_access_token, new_refresh_token
 
@@ -403,13 +399,15 @@ class OAuth2AuthPlugin(AuthPlugin):
         scopes: OAuth scopes to request
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "client_id": "xxx.apps.googleusercontent.com",
-        ...     "client_secret": "GOCSPX-xxx",
-        ...     "redirect_uri": "https://example.com/auth/callback",
-        ...     "provider": "google",
-        ...     "scopes": ["openid", "email", "profile"],
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "client_id": "xxx.apps.googleusercontent.com",
+        ...         "client_secret": "GOCSPX-xxx",
+        ...         "redirect_uri": "https://example.com/auth/callback",
+        ...         "provider": "google",
+        ...         "scopes": ["openid", "email", "profile"],
+        ...     }
+        ... )
         >>> plugin = OAuth2AuthPlugin()
         >>> await plugin.init(context)
     """

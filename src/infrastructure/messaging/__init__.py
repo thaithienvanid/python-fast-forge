@@ -42,6 +42,7 @@ from src.infrastructure.messaging.queue import (
 )
 from src.infrastructure.messaging.scheduler import JobScheduler, ScheduledJob
 
+
 __all__ = [
     # Message Queue
     "MessageQueue",

@@ -20,10 +20,10 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import lru_cache
-from typing import Any
 
 from src.infrastructure.config import get_settings
 from src.infrastructure.logging.config import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -104,7 +104,7 @@ class EmailService:
                 bcc=bcc,
                 reply_to=reply_to,
             )
-        elif self._provider == "sendgrid":
+        if self._provider == "sendgrid":
             return await self._send_via_sendgrid(
                 to=to,
                 subject=subject,
@@ -114,8 +114,7 @@ class EmailService:
                 bcc=bcc,
                 reply_to=reply_to,
             )
-        else:
-            raise ValueError(f"Unsupported email provider: {self._provider}")
+        raise ValueError(f"Unsupported email provider: {self._provider}")
 
     async def _send_via_smtp(
         self,

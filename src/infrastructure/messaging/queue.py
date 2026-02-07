@@ -29,15 +29,16 @@ Example:
 """
 
 import asyncio
-import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine
-from uuid import UUID, uuid4
+from typing import Any
+from uuid import uuid4
 
 from src.infrastructure.logging.config import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -159,7 +160,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.connect()
         """
-        pass
 
     @abstractmethod
     async def disconnect(self) -> None:
@@ -168,7 +168,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.disconnect()
         """
-        pass
 
     @abstractmethod
     async def publish(
@@ -198,7 +197,6 @@ class MessageQueue(ABC):
             ...     priority=MessagePriority.HIGH,
             ... )
         """
-        pass
 
     def subscribe(
         self,
@@ -238,7 +236,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.start_consuming()  # Blocks until stop_consuming()
         """
-        pass
 
     @abstractmethod
     async def stop_consuming(self) -> None:
@@ -247,7 +244,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.stop_consuming()
         """
-        pass
 
     @abstractmethod
     async def acknowledge(self, message: Message) -> None:
@@ -259,7 +255,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.acknowledge(message)
         """
-        pass
 
     @abstractmethod
     async def reject(
@@ -276,7 +271,6 @@ class MessageQueue(ABC):
         Example:
             >>> await queue.reject(message, requeue=True)
         """
-        pass
 
     async def _handle_message(
         self,
@@ -366,20 +360,19 @@ class MessageQueue(ABC):
 
             return RabbitMQQueue(url, **kwargs)
 
-        elif scheme == "redis":
+        if scheme == "redis":
             from src.infrastructure.messaging.redis_queue import RedisQueue
 
             return RedisQueue(url, **kwargs)
 
-        elif scheme == "sqs":
+        if scheme == "sqs":
             raise NotImplementedError("SQS queue not yet implemented")
 
-        else:
-            raise ValueError(f"Unsupported queue URL scheme: {scheme}")
+        raise ValueError(f"Unsupported queue URL scheme: {scheme}")
 
 
 __all__ = [
     "Message",
-    "MessageQueue",
     "MessagePriority",
+    "MessageQueue",
 ]

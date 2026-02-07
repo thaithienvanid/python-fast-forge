@@ -27,7 +27,7 @@ Features:
 import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.events import (
@@ -42,6 +42,7 @@ from src.infrastructure.persistence.read_models import UserReadModel
 from src.infrastructure.repositories.event_store_repository import (
     EventStoreRepository,
 )
+
 
 logger = get_logger(__name__)
 
@@ -291,9 +292,7 @@ class UserProjectionWorker:
         logger.warning("rebuild_started", projection="user_projection")
 
         # Clear read model
-        await self._session.execute(
-            update(UserReadModel).values(deleted_at=datetime.now(UTC))
-        )
+        await self._session.execute(update(UserReadModel).values(deleted_at=datetime.now(UTC)))
         await self._session.commit()
 
         # Replay all events from beginning
@@ -398,9 +397,7 @@ class UserProjectionWorker:
 
         # Execute update
         stmt = (
-            update(UserReadModel)
-            .where(UserReadModel.id == event.user_id)
-            .values(**update_values)
+            update(UserReadModel).where(UserReadModel.id == event.user_id).values(**update_values)
         )
 
         await self._session.execute(stmt)
@@ -478,6 +475,6 @@ class UserProjectionWorker:
 
 
 __all__ = [
-    "UserProjectionWorker",
     "ProjectionCheckpoint",
+    "UserProjectionWorker",
 ]

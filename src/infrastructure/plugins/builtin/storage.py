@@ -21,9 +21,8 @@ Example:
     >>> url = await plugin.get_url("documents/invoice.pdf")
 """
 
-import os
 from abc import abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -69,10 +68,9 @@ class StoragePlugin(Plugin):
             ...     "avatars/user123.jpg",
             ...     image_bytes,
             ...     content_type="image/jpeg",
-            ...     metadata={"user_id": "123"}
+            ...     metadata={"user_id": "123"},
             ... )
         """
-        pass
 
     @abstractmethod
     async def download(self, path: str) -> bytes:
@@ -90,7 +88,6 @@ class StoragePlugin(Plugin):
         Example:
             >>> content = await plugin.download("documents/invoice.pdf")
         """
-        pass
 
     @abstractmethod
     async def delete(self, path: str) -> None:
@@ -102,7 +99,6 @@ class StoragePlugin(Plugin):
         Example:
             >>> await plugin.delete("temp/old-file.txt")
         """
-        pass
 
     @abstractmethod
     async def exists(self, path: str) -> bool:
@@ -118,7 +114,6 @@ class StoragePlugin(Plugin):
             >>> if await plugin.exists("avatars/user123.jpg"):
             ...     print("Avatar exists")
         """
-        pass
 
     @abstractmethod
     async def get_url(
@@ -144,7 +139,6 @@ class StoragePlugin(Plugin):
             >>> # Signed URL (expires in 1 hour)
             >>> url = await plugin.get_url("private/document.pdf", expires_in=3600)
         """
-        pass
 
     async def list_files(
         self,
@@ -180,10 +174,12 @@ class LocalStoragePlugin(StoragePlugin):
         public_url_base: Base URL for public files (optional)
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "base_path": "/var/app/storage",
-        ...     "public_url_base": "https://example.com/files",
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "base_path": "/var/app/storage",
+        ...         "public_url_base": "https://example.com/files",
+        ...     }
+        ... )
         >>> plugin = LocalStoragePlugin()
         >>> await plugin.init(context)
     """
@@ -337,12 +333,14 @@ class S3StoragePlugin(StoragePlugin):
         public_url_base: Base URL for public files (optional)
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "bucket": "my-app-files",
-        ...     "region": "us-west-2",
-        ...     "access_key_id": "AKIAIOSFODNN7EXAMPLE",
-        ...     "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "bucket": "my-app-files",
+        ...         "region": "us-west-2",
+        ...         "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+        ...         "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        ...     }
+        ... )
         >>> plugin = S3StoragePlugin()
         >>> await plugin.init(context)
     """
@@ -631,11 +629,13 @@ class S3StoragePlugin(StoragePlugin):
 
             files = []
             for obj in response.get("Contents", []):
-                files.append({
-                    "path": obj["Key"],
-                    "size": obj["Size"],
-                    "modified_at": obj["LastModified"],
-                })
+                files.append(
+                    {
+                        "path": obj["Key"],
+                        "size": obj["Size"],
+                        "modified_at": obj["LastModified"],
+                    }
+                )
 
             if self.context and self.context.logger:
                 self.context.logger.info(
@@ -659,7 +659,7 @@ class S3StoragePlugin(StoragePlugin):
 
 
 __all__ = [
-    "StoragePlugin",
     "LocalStoragePlugin",
     "S3StoragePlugin",
+    "StoragePlugin",
 ]

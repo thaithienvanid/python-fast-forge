@@ -78,7 +78,6 @@ class EmailPlugin(Plugin):
             ...     html=True,
             ... )
         """
-        pass
 
     async def send_bulk(
         self,
@@ -96,10 +95,12 @@ class EmailPlugin(Plugin):
             List of message IDs
 
         Example:
-            >>> message_ids = await plugin.send_bulk([
-            ...     {"to": "user1@example.com", "subject": "Hi", "body": "..."},
-            ...     {"to": "user2@example.com", "subject": "Hi", "body": "..."},
-            ... ])
+            >>> message_ids = await plugin.send_bulk(
+            ...     [
+            ...         {"to": "user1@example.com", "subject": "Hi", "body": "..."},
+            ...         {"to": "user2@example.com", "subject": "Hi", "body": "..."},
+            ...     ]
+            ... )
         """
         message_ids = []
         for email in emails:
@@ -124,14 +125,16 @@ class SMTPEmailPlugin(EmailPlugin):
         use_ssl: Use SSL (default: False)
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "host": "smtp.gmail.com",
-        ...     "port": 587,
-        ...     "username": "myapp@gmail.com",
-        ...     "password": "app_password",
-        ...     "from_email": "noreply@example.com",
-        ...     "from_name": "My App",
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "host": "smtp.gmail.com",
+        ...         "port": 587,
+        ...         "username": "myapp@gmail.com",
+        ...         "password": "app_password",
+        ...         "from_email": "noreply@example.com",
+        ...         "from_name": "My App",
+        ...     }
+        ... )
         >>> plugin = SMTPEmailPlugin()
         >>> await plugin.init(context)
     """
@@ -210,9 +213,7 @@ class SMTPEmailPlugin(EmailPlugin):
         # Create message
         msg = MIMEMultipart("alternative")
         msg["From"] = (
-            f"{self._from_name} <{self._from_email}>"
-            if self._from_name
-            else self._from_email
+            f"{self._from_name} <{self._from_email}>" if self._from_name else self._from_email
         )
         msg["To"] = ", ".join(to_list)
         msg["Subject"] = subject
@@ -299,11 +300,13 @@ class SendGridEmailPlugin(EmailPlugin):
         template_id: Default template ID (optional)
 
     Example:
-        >>> context = PluginContext(config={
-        ...     "api_key": "SG.xxx",
-        ...     "from_email": "noreply@example.com",
-        ...     "from_name": "My App",
-        ... })
+        >>> context = PluginContext(
+        ...     config={
+        ...         "api_key": "SG.xxx",
+        ...         "from_email": "noreply@example.com",
+        ...         "from_name": "My App",
+        ...     }
+        ... )
         >>> plugin = SendGridEmailPlugin()
         >>> await plugin.init(context)
     """
@@ -444,9 +447,7 @@ class SendGridEmailPlugin(EmailPlugin):
                 for attachment_data in attachments:
                     filename = attachment_data.get("filename", "attachment")
                     content = attachment_data.get("content", b"")
-                    mime_type = attachment_data.get(
-                        "mime_type", "application/octet-stream"
-                    )
+                    mime_type = attachment_data.get("mime_type", "application/octet-stream")
 
                     # Encode content to base64
                     if isinstance(content, str):

@@ -24,21 +24,20 @@ Example:
     >>> await email_plugin.send_email("user@example.com", "Hello", "World")
 """
 
-import asyncio
 import importlib
 import importlib.util
 import inspect
 from pathlib import Path
-from typing import Any, Type, TypeVar
+from typing import Any, TypeVar
 
 from src.infrastructure.logging.config import get_logger
 from src.infrastructure.plugins.base import (
     Plugin,
     PluginContext,
     PluginLoadError,
-    PluginMetadata,
     PluginStatus,
 )
+
 
 logger = get_logger(__name__)
 
@@ -96,7 +95,7 @@ class PluginManager:
             metrics: Metrics collector
         """
         self._plugins: dict[str, Plugin] = {}
-        self._plugin_types: dict[str, Type[Plugin]] = {}
+        self._plugin_types: dict[str, type[Plugin]] = {}
         self._contexts: dict[str, PluginContext] = {}
         self._global_context = {
             "app_config": app_config or {},
@@ -166,7 +165,7 @@ class PluginManager:
 
         logger.info("plugin_discovery_complete", count=discovered_count)
 
-    async def _load_plugin_module(self, file_path: Path) -> list[Type[Plugin]]:
+    async def _load_plugin_module(self, file_path: Path) -> list[type[Plugin]]:
         """Load plugin classes from Python module.
 
         Args:
@@ -198,7 +197,7 @@ class PluginManager:
 
     async def register_plugin(
         self,
-        plugin_class: Type[Plugin],
+        plugin_class: type[Plugin],
         config: dict[str, Any] | None = None,
     ) -> None:
         """Manually register a plugin class.
@@ -210,10 +209,7 @@ class PluginManager:
             config: Plugin-specific configuration
 
         Example:
-            >>> await manager.register_plugin(
-            ...     SendGridEmailPlugin,
-            ...     config={"api_key": "sk_..."}
-            ... )
+            >>> await manager.register_plugin(SendGridEmailPlugin, config={"api_key": "sk_..."})
         """
         plugin_instance = plugin_class()
         plugin_name = plugin_instance.metadata.name
@@ -249,10 +245,7 @@ class PluginManager:
             PluginLoadError: If loading fails
 
         Example:
-            >>> plugin = await manager.load_plugin(
-            ...     "sendgrid-email",
-            ...     config={"api_key": "sk_..."}
-            ... )
+            >>> plugin = await manager.load_plugin("sendgrid-email", config={"api_key": "sk_..."})
         """
         if plugin_name in self._plugins:
             return self._plugins[plugin_name]
@@ -336,10 +329,12 @@ class PluginManager:
             configs: Plugin-specific configurations by plugin name
 
         Example:
-            >>> await manager.load_all(configs={
-            ...     "sendgrid-email": {"api_key": "sk_..."},
-            ...     "s3-storage": {"bucket": "my-bucket"},
-            ... })
+            >>> await manager.load_all(
+            ...     configs={
+            ...         "sendgrid-email": {"api_key": "sk_..."},
+            ...         "s3-storage": {"bucket": "my-bucket"},
+            ...     }
+            ... )
         """
         configs = configs or {}
 
@@ -377,7 +372,7 @@ class PluginManager:
             graph[plugin_name] = plugin.metadata.dependencies
 
         # Topological sort (Kahn's algorithm)
-        in_degree = {plugin: 0 for plugin in graph}
+        in_degree = dict.fromkeys(graph, 0)
         for deps in graph.values():
             for dep in deps:
                 if dep in in_degree:
@@ -398,7 +393,7 @@ class PluginManager:
 
         return order
 
-    def get_plugin(self, plugin_name: str, plugin_type: Type[T] | None = None) -> T:
+    def get_plugin(self, plugin_name: str, plugin_type: type[T] | None = None) -> T:
         """Get loaded plugin by name.
 
         Args:
@@ -494,10 +489,7 @@ class PluginManager:
             Reloaded plugin instance
 
         Example:
-            >>> plugin = await manager.reload_plugin(
-            ...     "sendgrid-email",
-            ...     config={"api_key": "new_key"}
-            ... )
+            >>> plugin = await manager.reload_plugin("sendgrid-email", config={"api_key": "new_key"})
         """
         await self.unload_plugin(plugin_name)
         return await self.load_plugin(plugin_name, config)
@@ -531,9 +523,7 @@ class PluginManager:
                     "error": str(e),
                 }
 
-        healthy_count = sum(
-            1 for h in plugin_health.values() if h.get("status") == "active"
-        )
+        healthy_count = sum(1 for h in plugin_health.values() if h.get("status") == "active")
 
         return {
             "total": len(self._plugins),

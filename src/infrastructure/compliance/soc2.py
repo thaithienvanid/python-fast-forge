@@ -49,6 +49,7 @@ from pydantic import BaseModel, Field
 
 from src.infrastructure.logging.config import get_logger
 
+
 logger = get_logger(__name__)
 
 
@@ -573,8 +574,7 @@ class SOC2Compliance:
         cutoff = datetime.now(UTC) - timedelta(days=period_days)
 
         relevant_records = [
-            r for r in self._availability_records
-            if r.service == service and r.timestamp >= cutoff
+            r for r in self._availability_records if r.service == service and r.timestamp >= cutoff
         ]
 
         if not relevant_records:
@@ -645,8 +645,12 @@ class SOC2Compliance:
 
         # Calculate statistics
         total_changes = len(self._change_records)
-        approved_changes = len([c for c in self._change_records if c.status == ChangeStatus.APPROVED])
-        implemented_changes = len([c for c in self._change_records if c.status == ChangeStatus.IMPLEMENTED])
+        approved_changes = len(
+            [c for c in self._change_records if c.status == ChangeStatus.APPROVED]
+        )
+        implemented_changes = len(
+            [c for c in self._change_records if c.status == ChangeStatus.IMPLEMENTED]
+        )
 
         monitoring_alerts = len([e for e in self._monitoring_events if e.alert_triggered])
 
@@ -683,12 +687,12 @@ class SOC2Compliance:
 
 
 __all__ = [
-    "SOC2Compliance",
-    "ChangeRecord",
-    "MonitoringEvent",
-    "AvailabilityRecord",
     "AccessAudit",
-    "TrustServiceCriteria",
-    "ChangeType",
+    "AvailabilityRecord",
+    "ChangeRecord",
     "ChangeStatus",
+    "ChangeType",
+    "MonitoringEvent",
+    "SOC2Compliance",
+    "TrustServiceCriteria",
 ]

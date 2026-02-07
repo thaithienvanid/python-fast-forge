@@ -12,10 +12,10 @@ Features:
 """
 
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy import Column, DateTime, Index, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
 from src.domain.models.base import Base
 

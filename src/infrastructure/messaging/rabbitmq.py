@@ -34,6 +34,7 @@ from typing import Any
 from src.infrastructure.logging.config import get_logger
 from src.infrastructure.messaging.queue import Message, MessagePriority, MessageQueue
 
+
 logger = get_logger(__name__)
 
 
@@ -98,7 +99,7 @@ class RabbitMQQueue(MessageQueue):
 
             logger.info("rabbitmq_connected", url=self._url)
 
-        except ImportError as e:
+        except ImportError:
             logger.warning(
                 "rabbitmq_not_available",
                 error="aio-pika not installed",
@@ -160,8 +161,6 @@ class RabbitMQQueue(MessageQueue):
             )
             self._queues[queue_name] = None
             return None
-
-        import aio_pika
 
         queue = await self._channel.declare_queue(
             queue_name,
@@ -271,8 +270,7 @@ class RabbitMQQueue(MessageQueue):
 
         Example:
             >>> @queue.subscribe("tasks.email")
-            >>> async def email_handler(message):
-            ...     ...
+            >>> async def email_handler(message): ...
             >>>
             >>> await queue.start_consuming()  # Blocks
         """

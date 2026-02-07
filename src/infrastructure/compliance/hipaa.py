@@ -44,6 +44,7 @@ from pydantic import BaseModel, Field
 
 from src.infrastructure.logging.config import get_logger
 
+
 logger = get_logger(__name__)
 
 
@@ -535,7 +536,7 @@ class HIPAACompliance:
 
 
 __all__ = [
-    "HIPAACompliance",
     "AuditEvent",
+    "HIPAACompliance",
     "PHIAccessType",
 ]

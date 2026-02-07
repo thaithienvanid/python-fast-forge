@@ -30,6 +30,7 @@ from src.infrastructure.compliance.iso27001 import ISO27001Compliance
 from src.infrastructure.compliance.soc2 import SOC2Compliance
 from src.infrastructure.logging.config import get_logger
 
+
 logger = get_logger(__name__)
 
 
@@ -118,9 +119,7 @@ class ComplianceManager:
         }
 
         # Check if all frameworks are compliant
-        all_compliant = all(
-            all(controls.values()) for controls in results.values()
-        )
+        all_compliant = all(all(controls.values()) for controls in results.values())
 
         logger.info(
             "compliance_verification_completed",
@@ -200,8 +199,7 @@ class ComplianceManager:
         controls = await self.verify_all_controls()
 
         status = {
-            framework: all(controls_dict.values())
-            for framework, controls_dict in controls.items()
+            framework: all(controls_dict.values()) for framework, controls_dict in controls.items()
         }
 
         return status
@@ -214,7 +212,7 @@ class ComplianceManager:
 
         Example:
             >>> health = await compliance.health_check()
-            >>> if health['healthy']:
+            >>> if health["healthy"]:
             ...     print("All compliance systems operational")
         """
         status = await self.get_compliance_status()

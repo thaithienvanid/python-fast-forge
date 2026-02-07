@@ -42,8 +42,6 @@ class ConcurrencyError(DomainException):
         >>> await event_store.append_event(event_b, expected_version=5)  # ConcurrencyError!
     """
 
-    pass
-
 
 class EventStoreRepository:
     """Repository for event store operations.
@@ -109,9 +107,7 @@ class EventStoreRepository:
             >>> print(f"New version: {new_version}")  # 1
         """
         # Get current version
-        current_version = await self._get_current_version(
-            aggregate_type, event.aggregate_id
-        )
+        current_version = await self._get_current_version(aggregate_type, event.aggregate_id)
 
         # Optimistic locking check
         if expected_version is not None and current_version != expected_version:
@@ -133,9 +129,15 @@ class EventStoreRepository:
             aggregate_version=new_version,
             event_data=event.model_dump(mode="json"),
             metadata={
-                "commanded_by": event.metadata.get("commanded_by") if hasattr(event, "metadata") else None,
-                "correlation_id": event.metadata.get("correlation_id") if hasattr(event, "metadata") else None,
-                "causation_id": event.metadata.get("causation_id") if hasattr(event, "metadata") else None,
+                "commanded_by": event.metadata.get("commanded_by")
+                if hasattr(event, "metadata")
+                else None,
+                "correlation_id": event.metadata.get("correlation_id")
+                if hasattr(event, "metadata")
+                else None,
+                "causation_id": event.metadata.get("causation_id")
+                if hasattr(event, "metadata")
+                else None,
             },
             occurred_at=event.occurred_at,
         )
@@ -263,9 +265,7 @@ class EventStoreRepository:
         """
         # Check if snapshot already exists
         existing = await self._session.execute(
-            select(EventStoreSnapshot).where(
-                EventStoreSnapshot.aggregate_id == aggregate_id
-            )
+            select(EventStoreSnapshot).where(EventStoreSnapshot.aggregate_id == aggregate_id)
         )
         snapshot = existing.scalar_one_or_none()
 
@@ -354,6 +354,6 @@ class EventStoreRepository:
 
 
 __all__ = [
-    "EventStoreRepository",
     "ConcurrencyError",
+    "EventStoreRepository",
 ]

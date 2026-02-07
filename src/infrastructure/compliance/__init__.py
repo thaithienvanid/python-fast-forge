@@ -30,10 +30,11 @@ from src.infrastructure.compliance.iso27001 import ISO27001Compliance
 from src.infrastructure.compliance.manager import ComplianceManager
 from src.infrastructure.compliance.soc2 import SOC2Compliance
 
+
 __all__ = [
     "ComplianceManager",
-    "HIPAACompliance",
     "GDPRCompliance",
+    "HIPAACompliance",
     "ISO27001Compliance",
     "SOC2Compliance",
 ]

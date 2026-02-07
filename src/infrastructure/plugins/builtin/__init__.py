@@ -37,17 +37,18 @@ from src.infrastructure.plugins.builtin.storage import (
     StoragePlugin,
 )
 
+
 __all__ = [
+    # Auth plugins
+    "AuthPlugin",
     # Email plugins
     "EmailPlugin",
+    "JWTAuthPlugin",
+    "LocalStoragePlugin",
+    "OAuth2AuthPlugin",
+    "S3StoragePlugin",
     "SMTPEmailPlugin",
     "SendGridEmailPlugin",
     # Storage plugins
     "StoragePlugin",
-    "LocalStoragePlugin",
-    "S3StoragePlugin",
-    # Auth plugins
-    "AuthPlugin",
-    "JWTAuthPlugin",
-    "OAuth2AuthPlugin",
 ]

@@ -30,14 +30,16 @@ Example:
 """
 
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Callable
+from typing import Any
 from uuid import uuid4
 
 from croniter import croniter
 
 from src.infrastructure.logging.config import get_logger
 from src.infrastructure.messaging.queue import MessageQueue
+
 
 logger = get_logger(__name__)
 
@@ -437,9 +439,7 @@ class JobScheduler:
                         # Acquire distributed lock if Redis available
                         if self._redis:
                             lock_key = f"scheduler:lock:{job.name}"
-                            lock_acquired = await self._redis.set(
-                                lock_key, "1", nx=True, ex=60
-                            )
+                            lock_acquired = await self._redis.set(lock_key, "1", nx=True, ex=60)
 
                             if not lock_acquired:
                                 # Another instance is running this job

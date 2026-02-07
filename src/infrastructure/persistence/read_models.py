@@ -17,9 +17,6 @@ Benefits:
 - Optimized for specific use cases
 """
 
-from datetime import datetime
-from uuid import UUID
-
 from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 

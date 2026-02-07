@@ -36,6 +36,7 @@ from redis.asyncio import Redis
 
 from src.infrastructure.logging.config import get_logger
 
+
 logger = get_logger(__name__)
 
 
@@ -219,8 +220,7 @@ class WebSocketManager:
 
         Example:
             >>> await manager.send_personal_message(
-            ...     connection_id,
-            ...     {"type": "notification", "data": {"message": "Hello!"}}
+            ...     connection_id, {"type": "notification", "data": {"message": "Hello!"}}
             ... )
         """
         websocket = self._connections.get(connection_id)
@@ -248,8 +248,7 @@ class WebSocketManager:
 
         Example:
             >>> await manager.send_to_user(
-            ...     user_id,
-            ...     {"type": "notification", "data": {"message": "New order!"}}
+            ...     user_id, {"type": "notification", "data": {"message": "New order!"}}
             ... )
         """
         connection_ids = self._user_connections.get(user_id, set()).copy()
