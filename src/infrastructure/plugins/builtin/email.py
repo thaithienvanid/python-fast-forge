@@ -21,8 +21,10 @@ Example:
     ... )
 """
 
+import base64
 import smtplib
 from abc import abstractmethod
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
@@ -224,7 +226,21 @@ class SMTPEmailPlugin(EmailPlugin):
         mime_type = "html" if html else "plain"
         msg.attach(MIMEText(body, mime_type))
 
-        # TODO: Add attachment support
+        # Add attachments if provided
+        if attachments:
+            for attachment in attachments:
+                filename = attachment.get("filename", "attachment")
+                content = attachment.get("content", b"")
+                mime_type_att = attachment.get("mime_type", "application/octet-stream")
+
+                # If content is string, encode it
+                if isinstance(content, str):
+                    content = content.encode()
+
+                part = MIMEApplication(content, Name=filename)
+                part["Content-Disposition"] = f'attachment; filename="{filename}"'
+                part["Content-Type"] = mime_type_att
+                msg.attach(part)
 
         # Send via SMTP
         try:
@@ -322,9 +338,20 @@ class SendGridEmailPlugin(EmailPlugin):
         self._from_name = context.config.get("from_name", "")
         self._template_id = context.config.get("template_id")
 
-        # TODO: Initialize SendGrid client
-        # from sendgrid import SendGridAPIClient
-        # self._client = SendGridAPIClient(self._api_key)
+        # Initialize SendGrid client
+        try:
+            from sendgrid import SendGridAPIClient
+
+            self._client = SendGridAPIClient(self._api_key)
+            self._sendgrid_available = True
+        except ImportError:
+            if context.logger:
+                context.logger.warning(
+                    "sendgrid_not_available",
+                    message="sendgrid library not installed. Install with: pip install sendgrid",
+                )
+            self._client = None
+            self._sendgrid_available = False
 
     async def validate(self) -> bool:
         """Validate SendGrid configuration."""
@@ -356,17 +383,108 @@ class SendGridEmailPlugin(EmailPlugin):
         Returns:
             Message ID from SendGrid
         """
-        # TODO: Implement SendGrid API call
-        # For now, this is a placeholder
+        # Check if SendGrid is available
+        if not self._sendgrid_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "sendgrid_unavailable",
+                    message="SendGrid client not available, email not sent",
+                )
+            return "sendgrid-unavailable"
 
-        if self.context and self.context.logger:
-            self.context.logger.info(
-                "sendgrid_email_sent",
-                to=to,
-                subject=subject,
+        try:
+            from sendgrid.helpers.mail import (
+                Attachment,
+                Content,
+                Email,
+                FileContent,
+                FileName,
+                FileType,
+                Mail,
+                Personalization,
             )
 
-        return "sendgrid-message-id"
+            # Normalize recipients
+            to_list = [to] if isinstance(to, str) else to
+
+            # Create mail object
+            mail = Mail()
+
+            # Set from address
+            mail.from_email = Email(self._from_email, self._from_name)
+
+            # Set subject
+            mail.subject = subject
+
+            # Add personalization (to, cc, bcc)
+            personalization = Personalization()
+            for recipient in to_list:
+                personalization.add_to(Email(recipient))
+
+            if cc:
+                for cc_recipient in cc:
+                    personalization.add_cc(Email(cc_recipient))
+
+            if bcc:
+                for bcc_recipient in bcc:
+                    personalization.add_bcc(Email(bcc_recipient))
+
+            mail.add_personalization(personalization)
+
+            # Set body content
+            content_type = "text/html" if html else "text/plain"
+            mail.add_content(Content(content_type, body))
+
+            # Add reply-to if provided
+            if reply_to:
+                mail.reply_to = Email(reply_to)
+
+            # Add attachments if provided
+            if attachments:
+                for attachment_data in attachments:
+                    filename = attachment_data.get("filename", "attachment")
+                    content = attachment_data.get("content", b"")
+                    mime_type = attachment_data.get(
+                        "mime_type", "application/octet-stream"
+                    )
+
+                    # Encode content to base64
+                    if isinstance(content, str):
+                        content = content.encode()
+                    encoded_content = base64.b64encode(content).decode()
+
+                    attachment = Attachment()
+                    attachment.file_content = FileContent(encoded_content)
+                    attachment.file_name = FileName(filename)
+                    attachment.file_type = FileType(mime_type)
+
+                    mail.add_attachment(attachment)
+
+            # Send via SendGrid API
+            response = self._client.send(mail)
+
+            message_id = response.headers.get("X-Message-Id", "unknown")
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "sendgrid_email_sent",
+                    to=to_list,
+                    subject=subject,
+                    message_id=message_id,
+                    status_code=response.status_code,
+                )
+
+            return message_id
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "sendgrid_send_failed",
+                    to=to,
+                    subject=subject,
+                    error=str(e),
+                )
+            raise
 
 
 __all__ = [

@@ -27,6 +27,9 @@ from abc import abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from authlib.jose import JoseError, jwt
+from authlib.jose.errors import ExpiredTokenError, InvalidTokenError
+
 from src.infrastructure.plugins.base import Plugin, PluginContext, PluginMetadata
 
 
@@ -200,9 +203,14 @@ class JWTAuthPlugin(AuthPlugin):
         self._issuer = context.config.get("issuer")
         self._audience = context.config.get("audience")
 
-        # TODO: Initialize PyJWT or python-jose
-        # import jwt
-        # self._jwt = jwt
+        # authlib is imported at module level
+        # No additional initialization needed
+        if context.logger:
+            context.logger.info(
+                "jwt_plugin_initialized",
+                algorithm=self._algorithm,
+                access_token_expires=self._access_token_expires,
+            )
 
     async def validate(self) -> bool:
         """Validate configuration."""
@@ -235,15 +243,32 @@ class JWTAuthPlugin(AuthPlugin):
         Raises:
             AuthenticationError: If credentials are invalid
         """
-        # TODO: Integrate with user repository
-        # For now, this is a placeholder
+        # IMPORTANT: Integrate with your user repository
+        # This is a placeholder implementation for testing.
+        # In production, you should:
+        # 1. Import your user repository
+        # 2. Hash the password and compare with stored hash
+        # 3. Return actual user data from your database
+        # Example:
+        #   user_repo = context.get_dependency("user_repository")
+        #   user = await user_repo.get_by_username(username)
+        #   if not user or not verify_password(password, user.password_hash):
+        #       raise AuthenticationError("Invalid credentials")
+        #   return {"user_id": str(user.id), "username": user.username, ...}
+
         username = credentials.get("username")
         password = credentials.get("password")
 
         if not username or not password:
             raise ValueError("Username and password required")
 
-        # Placeholder user info
+        if self.context and self.context.logger:
+            self.context.logger.warning(
+                "jwt_using_placeholder_auth",
+                message="Using placeholder authentication - integrate with user repository for production",
+            )
+
+        # Placeholder user info (for development/testing only)
         return {
             "user_id": "user-123",
             "username": username,
@@ -267,26 +292,35 @@ class JWTAuthPlugin(AuthPlugin):
         Returns:
             JWT token string
         """
-        # TODO: Implement actual JWT encoding
-        # import jwt
-        #
-        # now = datetime.now(UTC)
-        # expires_at = now + timedelta(seconds=expires_in or self._access_token_expires)
-        #
-        # payload = {
-        #     "sub": user_id,
-        #     "iat": int(now.timestamp()),
-        #     "exp": int(expires_at.timestamp()),
-        #     "iss": self._issuer,
-        #     "aud": self._audience,
-        #     **(claims or {}),
-        # }
-        #
-        # token = jwt.encode(payload, self._secret_key, algorithm=self._algorithm)
-        # return token
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(seconds=expires_in or self._access_token_expires)
 
-        # Placeholder
-        return f"jwt-token-{user_id}"
+        # Build payload
+        payload = {
+            "sub": user_id,
+            "iat": int(now.timestamp()),
+            "exp": int(expires_at.timestamp()),
+            **(claims or {}),
+        }
+
+        # Add optional issuer and audience
+        if self._issuer:
+            payload["iss"] = self._issuer
+        if self._audience:
+            payload["aud"] = self._audience
+
+        # Encode token using authlib
+        header = {"alg": self._algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, self._secret_key)
+
+        if self.context and self.context.logger:
+            self.context.logger.debug(
+                "jwt_token_created",
+                user_id=user_id,
+                expires_in=expires_in or self._access_token_expires,
+            )
+
+        return token
 
     async def verify_token(self, token: str) -> dict[str, Any]:
         """Verify and decode JWT token.
@@ -298,30 +332,34 @@ class JWTAuthPlugin(AuthPlugin):
             Decoded claims
 
         Raises:
-            AuthenticationError: If token is invalid or expired
+            Exception: If token is invalid or expired
         """
-        # TODO: Implement actual JWT decoding
-        # import jwt
-        #
-        # try:
-        #     payload = jwt.decode(
-        #         token,
-        #         self._secret_key,
-        #         algorithms=[self._algorithm],
-        #         issuer=self._issuer,
-        #         audience=self._audience,
-        #     )
-        #     return payload
-        # except jwt.ExpiredSignatureError:
-        #     raise AuthenticationError("Token expired")
-        # except jwt.InvalidTokenError as e:
-        #     raise AuthenticationError(f"Invalid token: {e}")
+        try:
+            # Decode token using authlib
+            jwt_claims = jwt.decode(token, self._secret_key)
 
-        # Placeholder
-        return {
-            "user_id": "user-123",
-            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
-        }
+            # Validate claims (checks exp, iat, iss, aud, etc.)
+            jwt_claims.validate()
+
+            # Convert to dict
+            payload = dict(jwt_claims)
+
+            if self.context and self.context.logger:
+                self.context.logger.debug(
+                    "jwt_token_verified",
+                    user_id=payload.get("sub"),
+                )
+
+            return payload
+
+        except ExpiredTokenError:
+            if self.context and self.context.logger:
+                self.context.logger.warning("jwt_token_expired")
+            raise Exception("Token expired")
+        except (InvalidTokenError, JoseError) as e:
+            if self.context and self.context.logger:
+                self.context.logger.warning("jwt_token_invalid", error=str(e))
+            raise Exception(f"Invalid token: {e}")
 
     async def refresh_token(
         self,
@@ -410,17 +448,73 @@ class OAuth2AuthPlugin(AuthPlugin):
         self._provider = context.config["provider"]
         self._scopes = context.config.get("scopes", [])
 
-        # TODO: Initialize OAuth2 client library
-        # from authlib.integrations.httpx_client import AsyncOAuth2Client
-        # self._client = AsyncOAuth2Client(
-        #     client_id=self._client_id,
-        #     client_secret=self._client_secret,
-        # )
+        # Initialize OAuth2 client using authlib
+        try:
+            from authlib.integrations.httpx_client import AsyncOAuth2Client
+
+            self._client = AsyncOAuth2Client(
+                client_id=self._client_id,
+                client_secret=self._client_secret,
+            )
+            self._oauth2_available = True
+
+            if context.logger:
+                context.logger.info(
+                    "oauth2_plugin_initialized",
+                    provider=self._provider,
+                    scopes=self._scopes,
+                )
+        except ImportError:
+            if context.logger:
+                context.logger.warning(
+                    "oauth2_not_available",
+                    message="authlib[asyncio] or httpx not installed. Install with: pip install authlib[asyncio] httpx",
+                )
+            self._client = None
+            self._oauth2_available = False
 
     async def validate(self) -> bool:
         """Validate OAuth2 configuration."""
         required = ["client_id", "client_secret", "redirect_uri", "provider"]
         return all(key in self.context.config for key in required)
+
+    def _get_provider_urls(self) -> dict[str, str]:
+        """Get provider-specific URLs for token and userinfo endpoints.
+
+        Returns:
+            Dict with token_url and userinfo_url for the provider
+        """
+        provider_configs = {
+            "google": {
+                "token_url": "https://oauth2.googleapis.com/token",
+                "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+                "introspect_url": "https://oauth2.googleapis.com/tokeninfo",
+            },
+            "github": {
+                "token_url": "https://github.com/login/oauth/access_token",
+                "userinfo_url": "https://api.github.com/user",
+                "introspect_url": None,  # GitHub doesn't have introspection endpoint
+            },
+            "facebook": {
+                "token_url": "https://graph.facebook.com/v12.0/oauth/access_token",
+                "userinfo_url": "https://graph.facebook.com/me?fields=id,name,email",
+                "introspect_url": "https://graph.facebook.com/debug_token",
+            },
+            "microsoft": {
+                "token_url": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+                "userinfo_url": "https://graph.microsoft.com/v1.0/me",
+                "introspect_url": None,  # Use Microsoft Graph API validation instead
+            },
+        }
+
+        return provider_configs.get(
+            self._provider,
+            {
+                "token_url": "",
+                "userinfo_url": "",
+                "introspect_url": None,
+            },
+        )
 
     async def authenticate(
         self,
@@ -434,18 +528,52 @@ class OAuth2AuthPlugin(AuthPlugin):
         Returns:
             User info from OAuth provider
         """
-        # TODO: Implement OAuth2 token exchange
-        # auth_code = credentials.get("authorization_code")
-        # token = await self._client.fetch_token(
-        #     token_url=self._get_token_url(),
-        #     code=auth_code,
-        #     redirect_uri=self._redirect_uri,
-        # )
-        #
-        # user_info = await self._client.get(self._get_userinfo_url())
-        # return user_info.json()
+        # Check if OAuth2 is available
+        if not self._oauth2_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "oauth2_unavailable",
+                    message="OAuth2 client not available, returning placeholder data",
+                )
+            return {"user_id": "oauth-user-123", "email": "user@example.com"}
 
-        return {"user_id": "oauth-user-123", "email": "user@example.com"}
+        auth_code = credentials.get("authorization_code")
+        if not auth_code:
+            raise ValueError("authorization_code required for OAuth2 authentication")
+
+        try:
+            # Get provider URLs
+            urls = self._get_provider_urls()
+
+            # Exchange authorization code for access token
+            token = await self._client.fetch_token(
+                url=urls["token_url"],
+                grant_type="authorization_code",
+                code=auth_code,
+                redirect_uri=self._redirect_uri,
+            )
+
+            # Fetch user info from provider
+            response = await self._client.get(urls["userinfo_url"])
+            user_info = response.json()
+
+            if self.context and self.context.logger:
+                self.context.logger.info(
+                    "oauth2_authentication_success",
+                    provider=self._provider,
+                    user_id=user_info.get("id") or user_info.get("sub"),
+                )
+
+            return user_info
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "oauth2_authentication_failed",
+                    provider=self._provider,
+                    error=str(e),
+                )
+            raise
 
     async def create_token(
         self,
@@ -457,9 +585,70 @@ class OAuth2AuthPlugin(AuthPlugin):
         raise NotImplementedError("Use OAuth2 provider tokens")
 
     async def verify_token(self, token: str) -> dict[str, Any]:
-        """Verify OAuth2 token with provider."""
-        # TODO: Implement token introspection
-        return {"user_id": "oauth-user-123"}
+        """Verify OAuth2 token with provider.
+
+        Args:
+            token: OAuth2 access token
+
+        Returns:
+            Token introspection result or user info
+
+        Raises:
+            Exception: If token is invalid or verification fails
+        """
+        # Check if OAuth2 is available
+        if not self._oauth2_available or not self._client:
+            if self.context and self.context.logger:
+                self.context.logger.warning(
+                    "oauth2_unavailable",
+                    message="OAuth2 client not available, returning placeholder data",
+                )
+            return {"user_id": "oauth-user-123", "active": True}
+
+        try:
+            urls = self._get_provider_urls()
+
+            # Some providers have introspection endpoint, others verify by fetching userinfo
+            if urls["introspect_url"]:
+                # Use token introspection endpoint
+                response = await self._client.post(
+                    urls["introspect_url"],
+                    data={"token": token},
+                )
+                introspection_result = response.json()
+
+                if self.context and self.context.logger:
+                    self.context.logger.debug(
+                        "oauth2_token_introspected",
+                        provider=self._provider,
+                        active=introspection_result.get("active", False),
+                    )
+
+                return introspection_result
+            else:
+                # Verify by fetching user info (implicit validation)
+                self._client.token = {"access_token": token, "token_type": "Bearer"}
+                response = await self._client.get(urls["userinfo_url"])
+                user_info = response.json()
+
+                if self.context and self.context.logger:
+                    self.context.logger.debug(
+                        "oauth2_token_verified",
+                        provider=self._provider,
+                    )
+
+                # Add active flag for consistency
+                user_info["active"] = True
+                return user_info
+
+        except Exception as e:
+            if self.context and self.context.logger:
+                self.context.logger.error(
+                    "oauth2_token_verification_failed",
+                    provider=self._provider,
+                    error=str(e),
+                )
+            raise
 
 
 __all__ = [
