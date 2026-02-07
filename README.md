@@ -44,6 +44,13 @@ uv run python main.py
 
 ## 🆕 Recent Updates (2026-02-07)
 
+🚨 **CRITICAL SECURITY UPDATE:**
+- **Fixed CVE-2025-61152** - JWT signature bypass in python-jose
+- **Migrated to authlib 1.6.6+** - More secure, actively maintained
+- **Breaking Change**: JWT API updated - see [`docs/security/SECURITY.md`](docs/security/SECURITY.md)
+- **All dependencies audited** - Updated to latest secure versions for Python 3.12+
+- **Enterprise compliance added** - SBOM generation, license scanning, vulnerability management
+
 ✨ **Major Enhancements Implemented (+7,136 lines):**
 
 **Phase 1: Event Sourcing & CQRS (2,048 lines)**

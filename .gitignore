@@ -40,6 +40,17 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Security & compliance reports
+compliance-reports/
+sbom.json
+sbom.xml
+licenses.md
+licenses.json
+dependencies.json
+bandit-report.json
+safety-report.json
+pip-audit-report.json
+
 # Environments
 .env
 .venv

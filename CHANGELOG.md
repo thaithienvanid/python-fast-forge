@@ -131,6 +131,46 @@ When you start your project from this template, document your changes below:
 
 ## [Unreleased] - 2026-02-07
 
+### 🚨 SECURITY - Critical Updates
+
+#### JWT Library Migration: python-jose → authlib
+- **CRITICAL**: Fixed CVE-2025-61152 - JWT signature bypass vulnerability in python-jose
+- **Impact**: `alg=none` tokens could bypass authentication entirely
+- **Solution**: Migrated to authlib 1.6.6+ (more secure, actively maintained)
+- **Breaking Change**: JWT encoding/decoding API changed - see `docs/security/SECURITY.md` for migration guide
+- **Security Improvements**:
+  - ✅ Rejects unsigned tokens by default
+  - ✅ Built-in type hints for mypy
+  - ✅ Better maintained (Pylint score 8/10 vs 5.67/10)
+  - ✅ OAuth 2.0 / OpenID Connect support
+
+#### Dependency Security Updates
+- **FastAPI**: Updated to 0.128.2+ (0 CVEs in 2025)
+- **cryptography**: Updated to 44.0.0+ (Python 3.12+ optimizations)
+- **uvicorn**: Updated to 0.34.0+ (latest stable)
+- **starlette**: Updated to 0.41.0+ (security patches)
+- All dependencies audited for CVEs and updated to latest secure versions
+
+#### Enterprise Compliance Tools Added
+- **cyclonedx-bom 7.2.1+**: Industry-standard SBOM generation (CycloneDX 1.5)
+- **pip-licenses 5.0.0+**: License scanning and compliance reporting
+- **licensecheck 2025.1.4+**: License compatibility verification
+- **pipdeptree 2.24.0+**: Dependency tree visualization
+- **Makefile targets**: `make sbom`, `make licenses`, `make compliance-package`, `make security-audit`
+
+#### New Infrastructure Dependencies
+- **aio-pika 9.6.0+**: RabbitMQ async client for message queue implementation
+- **croniter 6.0.2+**: CRON expression parsing for job scheduler
+- **sse-starlette 3.0.0+**: Server-Sent Events for real-time streaming
+
+#### Security Documentation
+- **NEW**: `docs/security/SECURITY.md` - Comprehensive security and compliance guide
+  - CVE-2025-61152 details and migration guide
+  - Enterprise compliance (SBOM, licenses, regulatory)
+  - Security best practices (JWT, API headers, input validation)
+  - Vulnerability management process
+  - Compliance reporting (NIST, OWASP, GDPR, SOC 2, ISO 27001, HIPAA, PCI DSS)
+
 ### Added - Major Features 🚀
 
 #### 🎯 Event Sourcing & CQRS Implementation (Phase 1)
