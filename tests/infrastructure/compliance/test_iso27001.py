@@ -1,11 +1,10 @@
 """Tests for ISO 27001:2022 Security Controls Implementation."""
 
 import pytest
-from datetime import UTC, datetime, timedelta
 
 from src.infrastructure.compliance.iso27001 import (
-    ISO27001Compliance,
     AccessLevel,
+    ISO27001Compliance,
     SecurityEventType,
 )
 
@@ -163,9 +162,7 @@ class TestISO27001Compliance:
         assert all(e.user_id == "user123" for e in user123_events)
 
         # Filter by event type
-        login_failures = await iso.get_security_events(
-            event_type=SecurityEventType.LOGIN_FAILURE
-        )
+        login_failures = await iso.get_security_events(event_type=SecurityEventType.LOGIN_FAILURE)
         assert all(e.event_type == SecurityEventType.LOGIN_FAILURE for e in login_failures)
 
     @pytest.mark.asyncio

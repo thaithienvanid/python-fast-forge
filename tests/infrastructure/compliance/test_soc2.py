@@ -1,13 +1,11 @@
 """Tests for SOC 2 Trust Service Criteria Implementation."""
 
 import pytest
-from datetime import UTC, datetime
 
 from src.infrastructure.compliance.soc2 import (
-    SOC2Compliance,
-    ChangeType,
     ChangeStatus,
-    TrustServiceCriteria,
+    ChangeType,
+    SOC2Compliance,
 )
 
 

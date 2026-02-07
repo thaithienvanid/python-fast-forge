@@ -151,9 +151,7 @@ class UserQueryHandler:
             stmt = stmt.where(UserReadModel.email.ilike(f"%{query.email_contains}%"))
 
         if query.username_contains:
-            stmt = stmt.where(
-                UserReadModel.username.ilike(f"%{query.username_contains}%")
-            )
+            stmt = stmt.where(UserReadModel.username.ilike(f"%{query.username_contains}%"))
 
         if query.created_after:
             stmt = stmt.where(UserReadModel.created_at >= query.created_after)

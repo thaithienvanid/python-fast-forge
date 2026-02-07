@@ -36,7 +36,7 @@ from src.domain.events.user_events import (
 
 # Event type registry for deserialization
 # Maps event_type strings to event classes
-EVENT_REGISTRY: dict[str, Type[DomainEvent]] = {}
+EVENT_REGISTRY: dict[str, type[DomainEvent]] = {}
 
 
 def register_event(event_type: str):
@@ -58,7 +58,7 @@ def register_event(event_type: str):
         ...     username: str
     """
 
-    def decorator(cls: Type[DomainEvent]) -> Type[DomainEvent]:
+    def decorator(cls: type[DomainEvent]) -> type[DomainEvent]:
         EVENT_REGISTRY[event_type] = cls
         # Set event_type as class attribute for convenience
         cls.event_type = event_type  # type: ignore
@@ -67,7 +67,7 @@ def register_event(event_type: str):
     return decorator
 
 
-def get_event_class(event_type: str) -> Type[DomainEvent]:
+def get_event_class(event_type: str) -> type[DomainEvent]:
     """Get event class from event type string.
 
     Args:
@@ -99,6 +99,7 @@ register_event("user.restored")(UserRestoredEvent)
 
 
 __all__ = [
+    "EVENT_REGISTRY",
     "DomainEvent",
     "EventBus",
     "UserCreatedEvent",
@@ -106,8 +107,7 @@ __all__ = [
     "UserRestoredEvent",
     "UserUpdatedEvent",
     "get_event_bus",
-    "reset_event_bus",
-    "EVENT_REGISTRY",
-    "register_event",
     "get_event_class",
+    "register_event",
+    "reset_event_bus",
 ]

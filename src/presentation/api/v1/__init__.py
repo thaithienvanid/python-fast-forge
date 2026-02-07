@@ -9,6 +9,7 @@ from src.presentation.api.v1.endpoints import (
     websocket,
 )
 
+
 api_router = APIRouter()
 
 # Include routers

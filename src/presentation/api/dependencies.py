@@ -13,6 +13,7 @@ from src.infrastructure.config import Settings, get_settings
 from src.presentation.schemas.error import ErrorDetail
 from src.utils.tenant_auth import decode_tenant_token
 
+
 # Alias for backward compatibility
 JWTError = JoseError
 
@@ -36,7 +37,7 @@ def get_compliance_manager() -> ComplianceManager:
         ```python
         @router.post("/users")
         async def create_user(
-            compliance: Annotated[ComplianceManager, Depends(get_compliance_manager)]
+            compliance: Annotated[ComplianceManager, Depends(get_compliance_manager)],
         ):
             # Log compliance event
             await compliance.hipaa.log_audit_event(...)
@@ -46,7 +47,11 @@ def get_compliance_manager() -> ComplianceManager:
     if _compliance_manager is None:
         settings = get_settings()
         # Use encryption key from settings if available, otherwise generate
-        encryption_key = settings.security.jwt_secret_key.encode()[:32] if hasattr(settings.security, "jwt_secret_key") else None
+        encryption_key = (
+            settings.security.jwt_secret_key.encode()[:32]
+            if hasattr(settings.security, "jwt_secret_key")
+            else None
+        )
         _compliance_manager = ComplianceManager(encryption_key=encryption_key)
     return _compliance_manager
 

@@ -4,6 +4,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
+
 T = TypeVar("T")
 
 
@@ -20,9 +21,7 @@ class BaseResponse(BaseModel, Generic[T]):
     Example:
         ```python
         return BaseResponse(
-            success=True,
-            message="User created successfully",
-            data={"user_id": "123"}
+            success=True, message="User created successfully", data={"user_id": "123"}
         )
         ```
     """
@@ -45,11 +44,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     Example:
         ```python
         return PaginatedResponse(
-            items=[user1, user2, user3],
-            total=100,
-            page=1,
-            page_size=10,
-            pages=10
+            items=[user1, user2, user3], total=100, page=1, page_size=10, pages=10
         )
         ```
     """

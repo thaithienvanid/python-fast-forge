@@ -65,6 +65,7 @@ from src.infrastructure.logging.config import get_logger
 from src.infrastructure.realtime.websocket_manager import WebSocketManager
 from src.utils.tenant_auth import decode_tenant_token
 
+
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -143,7 +144,7 @@ async def authenticate_websocket(token: str) -> tuple[UUID, UUID]:
         )
         raise HTTPException(
             status_code=401,
-            detail=f"Authentication failed: {str(e)}",
+            detail=f"Authentication failed: {e!s}",
         )
 
 
@@ -231,9 +232,7 @@ async def websocket_endpoint(
                     # Validate tenant isolation: users can only subscribe to their tenant's rooms
                     # Rooms should be namespaced: "tenant:<tenant_id>:..." or "user:<user_id>"
                     allowed = False
-                    if room.startswith(f"tenant:{tenant_id}"):
-                        allowed = True
-                    elif room.startswith(f"user:{user_id}"):
+                    if room.startswith(f"tenant:{tenant_id}") or room.startswith(f"user:{user_id}"):
                         allowed = True
                     elif room.startswith("public:"):
                         # Allow public rooms
@@ -269,9 +268,7 @@ async def websocket_endpoint(
 
             elif message_type == "ping":
                 # Heartbeat
-                await ws_manager.send_personal_message(
-                    connection_id, {"type": "pong"}
-                )
+                await ws_manager.send_personal_message(connection_id, {"type": "pong"})
 
             elif message_type == "message":
                 # Broadcast message to room

@@ -65,6 +65,7 @@ from src.infrastructure.config import get_settings
 from src.infrastructure.logging.config import get_logger
 from src.utils.tenant_auth import decode_tenant_token
 
+
 logger = get_logger(__name__)
 router = APIRouter()
 
@@ -130,7 +131,7 @@ async def authenticate_sse(token: str) -> tuple[UUID, UUID]:
         )
         raise HTTPException(
             status_code=401,
-            detail=f"Authentication failed: {str(e)}",
+            detail=f"Authentication failed: {e!s}",
         )
 
 
@@ -225,9 +226,7 @@ async def sse_stream(
                     break
 
                 # Get message from Redis (non-blocking with timeout)
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
 
                 if message and message["type"] == "message":
                     try:
@@ -284,9 +283,7 @@ class SSEPublisher:
     Example:
         >>> publisher = SSEPublisher(redis_client)
         >>> await publisher.publish_to_user(
-        ...     user_id,
-        ...     "notification",
-        ...     {"message": "New order received!"}
+        ...     user_id, "notification", {"message": "New order received!"}
         ... )
     """
 
@@ -315,9 +312,7 @@ class SSEPublisher:
 
         Example:
             >>> await publisher.publish_to_user(
-            ...     user_id,
-            ...     "notification",
-            ...     {"message": "Hello!", "level": "info"}
+            ...     user_id, "notification", {"message": "Hello!", "level": "info"}
             ... )
         """
         message = {
@@ -352,9 +347,7 @@ class SSEPublisher:
 
         Example:
             >>> await publisher.publish_to_tenant(
-            ...     tenant_id,
-            ...     "system_notification",
-            ...     {"message": "Maintenance scheduled for tonight"}
+            ...     tenant_id, "system_notification", {"message": "Maintenance scheduled for tonight"}
             ... )
         """
         message = {
@@ -391,10 +384,7 @@ class SSEPublisher:
 
         Example:
             >>> await publisher.publish_notification(
-            ...     user_id,
-            ...     "Your order has been shipped!",
-            ...     level="success",
-            ...     action_url="/orders/123"
+            ...     user_id, "Your order has been shipped!", level="success", action_url="/orders/123"
             ... )
         """
         data = {

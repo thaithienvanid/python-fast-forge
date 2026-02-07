@@ -205,7 +205,7 @@ class RestoreUserCommand(BaseModel):
 
 __all__ = [
     "CreateUserCommand",
-    "UpdateUserCommand",
     "DeleteUserCommand",
     "RestoreUserCommand",
+    "UpdateUserCommand",
 ]

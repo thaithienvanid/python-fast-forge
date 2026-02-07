@@ -14,39 +14,35 @@ Security:
 Example:
     ```python
     # Record GDPR consent
-    POST /api/v1/compliance/gdpr/consent
-    {
-        "user_id": "user-uuid",
-        "purpose": "marketing",
-        "consent_given": true
-    }
+    POST / api / v1 / compliance / gdpr / consent
+    {"user_id": "user-uuid", "purpose": "marketing", "consent_given": true}
 
     # Encrypt PHI (HIPAA)
-    POST /api/v1/compliance/hipaa/encrypt
+    POST / api / v1 / compliance / hipaa / encrypt
     {
         "data": {"ssn": "123-45-6789", "diagnosis": "..."},
         "user_id": "doctor-uuid",
-        "patient_id": "patient-uuid"
+        "patient_id": "patient-uuid",
     }
 
     # Get compliance reports
-    GET /api/v1/compliance/reports
+    GET / api / v1 / compliance / reports
     ```
 """
 
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from src.infrastructure.compliance import ComplianceManager
 from src.infrastructure.compliance.gdpr import ProcessingPurpose
-from src.infrastructure.compliance.hipaa import PHIAccessType
 from src.infrastructure.compliance.iso27001 import AccessLevel, SecurityEventType
-from src.infrastructure.compliance.soc2 import ChangeStatus, ChangeType
+from src.infrastructure.compliance.soc2 import ChangeType
 from src.presentation.api.dependencies import get_compliance_manager, get_tenant_id
 from src.presentation.schemas.base import BaseResponse
+
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 

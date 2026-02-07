@@ -1,12 +1,12 @@
 """Tests for HIPAA Technical Safeguards Implementation."""
 
-import pytest
 from datetime import UTC, datetime, timedelta
+
+import pytest
 
 from src.infrastructure.compliance.hipaa import (
     HIPAACompliance,
     PHIAccessType,
-    AuditEvent,
 )
 
 

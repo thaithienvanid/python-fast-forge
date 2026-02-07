@@ -377,9 +377,7 @@ class UserCommandHandler:
             from_version = 0
 
         # Replay events since snapshot
-        async for event in self._event_store.get_events(
-            user_id, "User", from_version=from_version
-        ):
+        async for event in self._event_store.get_events(user_id, "User", from_version=from_version):
             user = self._apply_event(user, event)
 
         if user is None:
@@ -418,7 +416,7 @@ class UserCommandHandler:
                 updated_at=event.occurred_at,
             )
 
-        elif isinstance(event, UserUpdatedEvent):
+        if isinstance(event, UserUpdatedEvent):
             # Update events modify fields
             if user is None:
                 raise ValueError("Cannot apply UserUpdatedEvent to None")
@@ -428,7 +426,7 @@ class UserCommandHandler:
             user.updated_at = event.occurred_at
             return user
 
-        elif isinstance(event, UserDeletedEvent):
+        if isinstance(event, UserDeletedEvent):
             # Delete event sets deleted_at
             if user is None:
                 raise ValueError("Cannot apply UserDeletedEvent to None")
@@ -436,7 +434,7 @@ class UserCommandHandler:
             user.deleted_at = event.occurred_at
             return user
 
-        elif isinstance(event, UserRestoredEvent):
+        if isinstance(event, UserRestoredEvent):
             # Restore event clears deleted_at
             if user is None:
                 raise ValueError("Cannot apply UserRestoredEvent to None")

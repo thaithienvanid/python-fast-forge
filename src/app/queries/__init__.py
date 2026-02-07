@@ -212,9 +212,9 @@ class UserStatsQuery(BaseModel):
 
 
 __all__ = [
-    "UserQueryModel",
-    "UserListQuery",
     "UserDetailQuery",
+    "UserListQuery",
+    "UserQueryModel",
     "UserSearchQuery",
     "UserStatsQuery",
 ]

@@ -1,13 +1,14 @@
 """Tests for GDPR Data Protection Implementation."""
 
-import pytest
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from src.infrastructure.compliance.gdpr import (
+    BreachSeverity,
+    DataCategory,
     GDPRCompliance,
     ProcessingPurpose,
-    DataCategory,
-    BreachSeverity,
 )
 
 

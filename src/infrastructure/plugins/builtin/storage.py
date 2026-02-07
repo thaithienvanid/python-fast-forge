@@ -285,8 +285,7 @@ class LocalStoragePlugin(StoragePlugin):
         """
         if self._public_url_base:
             return f"{self._public_url_base.rstrip('/')}/{path}"
-        else:
-            return f"file://{self._base_path / path}"
+        return f"file://{self._base_path / path}"
 
     async def list_files(
         self,

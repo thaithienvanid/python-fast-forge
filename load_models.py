@@ -6,6 +6,9 @@ schema definition from your SQLAlchemy models.
 """
 
 # Import all models - add new models here as you create them
+# This is required - all models must be imported before calling print_ddl
+from atlas_provider_sqlalchemy.ddl import print_ddl
+
 from src.domain.models.user import User
 
 # Import event sourcing models
@@ -14,8 +17,6 @@ from src.infrastructure.persistence.event_store_models import (
     EventStoreSnapshot,
 )
 
-# This is required - all models must be imported before calling print_ddl
-from atlas_provider_sqlalchemy.ddl import print_ddl
 
 # Print the DDL for Atlas to consume
 if __name__ == "__main__":

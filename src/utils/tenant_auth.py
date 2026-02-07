@@ -15,7 +15,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from authlib.jose import JoseError, jwt
-from authlib.jose.errors import ExpiredTokenError, InvalidTokenError
 from structlog import get_logger
 
 from src.domain.tenant_claims import TenantTokenClaims

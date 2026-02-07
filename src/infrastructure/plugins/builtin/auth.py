@@ -623,21 +623,20 @@ class OAuth2AuthPlugin(AuthPlugin):
                     )
 
                 return introspection_result
-            else:
-                # Verify by fetching user info (implicit validation)
-                self._client.token = {"access_token": token, "token_type": "Bearer"}
-                response = await self._client.get(urls["userinfo_url"])
-                user_info = response.json()
+            # Verify by fetching user info (implicit validation)
+            self._client.token = {"access_token": token, "token_type": "Bearer"}
+            response = await self._client.get(urls["userinfo_url"])
+            user_info = response.json()
 
-                if self.context and self.context.logger:
-                    self.context.logger.debug(
-                        "oauth2_token_verified",
-                        provider=self._provider,
-                    )
+            if self.context and self.context.logger:
+                self.context.logger.debug(
+                    "oauth2_token_verified",
+                    provider=self._provider,
+                )
 
-                # Add active flag for consistency
-                user_info["active"] = True
-                return user_info
+            # Add active flag for consistency
+            user_info["active"] = True
+            return user_info
 
         except Exception as e:
             if self.context and self.context.logger:
