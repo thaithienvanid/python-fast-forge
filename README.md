@@ -93,7 +93,7 @@ uv run python main.py
 
 📊 **Quality Metrics:** ~21,500 lines of Python (+11,000 new) • 55 compliance tests • 90%+ compliance coverage • 0 linting errors • 0 type errors
 
-👉 **[View full changelog](./CHANGELOG.md)** | **[Enhancement proposals](./docs/architecture/enhancement-proposals.md)**
+👉 **[View full changelog](./CHANGELOG.md)**
 
 ---
 
@@ -258,9 +258,6 @@ graph TB
 ### Operations & Deployment
 - [Production Deployment Guide](./docs/deployment/production-guide.md) - Complete production deployment
 - [Operations Runbook](./docs/operations/runbook.md) - Incident response & troubleshooting
-
-### Architecture & Planning
-- [Enhancement Proposals](./docs/architecture/enhancement-proposals.md) - Strategic roadmap (Event Sourcing, WebSocket, Plugin System, etc.)
 
 ## 🛠️ Technology Stack
 

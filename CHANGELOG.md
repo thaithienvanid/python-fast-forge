@@ -390,12 +390,6 @@ When you start your project from this template, document your changes below:
 - **Cloud Platforms**: AWS, GCP, Azure deployment instructions
 - **Location**: `docs/deployment/production-guide.md`
 
-#### 🔮 Enhancement Proposals Document
-- **Strategic Roadmap**: 2,275-line document with 8 production-ready enhancement packages
-- **Proposals**: Event Sourcing & CQRS, Real-Time Streaming (WebSocket/SSE), Plugin System, Message Queue (RabbitMQ/Kafka), Advanced Observability, API Gateway (GraphQL/gRPC), Full-Text Search, Multi-Database Support
-- **Implementation**: Complete code examples, architecture diagrams, 24-week phased rollout plan
-- **Location**: `docs/architecture/enhancement-proposals.md`
-
 ### Fixed - Critical Issues 🐛
 
 #### Circular Import Resolution
