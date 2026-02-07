@@ -182,16 +182,16 @@ audit:  ## Audit dependencies for vulnerabilities
 # ===================================
 sbom:  ## Generate CycloneDX SBOM (Software Bill of Materials)
 	@echo "→ Generating CycloneDX SBOM..."
-	@$(UV) run cyclonedx-py environment --outfile sbom.json --format json --schema-version 1.5
-	@$(UV) run cyclonedx-py environment --outfile sbom.xml --format xml --schema-version 1.5
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5
+	@$(UV) run cyclonedx-py environment -o sbom.xml --of XML --sv 1.5
 	@echo "✓ SBOM generated: sbom.json, sbom.xml"
 
 sbom-json:  ## Generate SBOM in JSON format only
-	@$(UV) run cyclonedx-py environment --outfile sbom.json --format json --schema-version 1.5
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5
 	@echo "✓ SBOM generated: sbom.json"
 
 sbom-xml:  ## Generate SBOM in XML format only
-	@$(UV) run cyclonedx-py environment --outfile sbom.xml --format xml --schema-version 1.5
+	@$(UV) run cyclonedx-py environment -o sbom.xml --of XML --sv 1.5
 	@echo "✓ SBOM generated: sbom.xml"
 
 licenses:  ## Generate license report (markdown)
@@ -207,6 +207,19 @@ license-check:  ## Check license compatibility
 	@echo "→ Checking license compatibility..."
 	@$(UV) run licensecheck --format text
 
+trivy-scan:  ## Run Trivy security scanner on filesystem
+	@echo "→ Running Trivy filesystem scan..."
+	@trivy fs --severity HIGH,CRITICAL --format table .
+
+trivy-scan-full:  ## Run complete Trivy scan (all severities)
+	@echo "→ Running complete Trivy scan..."
+	@trivy fs --format table .
+
+trivy-scan-json:  ## Run Trivy scan and export to JSON
+	@echo "→ Running Trivy scan (JSON output)..."
+	@trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+	@echo "✓ Trivy report generated: trivy-report.json"
+
 dependency-tree:  ## Show dependency tree
 	@$(UV) run pipdeptree
 
@@ -217,8 +230,8 @@ dependency-tree-json:  ## Export dependency tree to JSON
 compliance-package:  ## Generate complete compliance bundle (SBOM + licenses + dependencies)
 	@echo "→ Generating enterprise compliance package..."
 	@mkdir -p compliance-reports
-	@$(UV) run cyclonedx-py environment --outfile compliance-reports/sbom.json --format json --schema-version 1.5
-	@$(UV) run cyclonedx-py environment --outfile compliance-reports/sbom.xml --format xml --schema-version 1.5
+	@$(UV) run cyclonedx-py environment -o compliance-reports/sbom.json --of JSON --sv 1.5
+	@$(UV) run cyclonedx-py environment -o compliance-reports/sbom.xml --of XML --sv 1.5
 	@$(UV) run pip-licenses --format=markdown --output-file=compliance-reports/licenses.md
 	@$(UV) run pip-licenses --format=json --output-file=compliance-reports/licenses.json
 	@$(UV) run pipdeptree --json-tree > compliance-reports/dependencies.json
@@ -243,7 +256,7 @@ security-audit:  ## Complete security audit (all scans + compliance)
 	@$(UV) run licensecheck --format text
 	@echo ""
 	@echo "→ Step 5/5: Generating SBOM..."
-	@$(UV) run cyclonedx-py environment --outfile sbom.json --format json --schema-version 1.5 2>&1 | grep -v "WARNING" || true
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5 2>&1 | grep -v "WARNING" || true
 	@echo ""
 	@echo "✅ Security audit complete!"
 	@echo ""

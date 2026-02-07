@@ -114,6 +114,7 @@ All dependencies are continuously scanned using:
 
 | Tool | Purpose | Frequency |
 |------|---------|-----------|
+| **Trivy** | Comprehensive security scanner | Every commit (CI/CD) |
 | **Bandit** | Python security linter | Every commit (pre-commit) |
 | **Safety** | Known vulnerability database | Daily (CI/CD) |
 | **pip-audit** | CVE scanning for pip packages | Daily (CI/CD) |
@@ -152,15 +153,15 @@ uv sync --group security
 
 # Generate CycloneDX SBOM (JSON format)
 cyclonedx-py environment \
-  --outfile sbom.json \
-  --format json \
-  --schema-version 1.5
+  -o sbom.json \
+  --of JSON \
+  --sv 1.5
 
 # Generate SBOM (XML format for enterprise tools)
 cyclonedx-py environment \
-  --outfile sbom.xml \
-  --format xml \
-  --schema-version 1.5
+  -o sbom.xml \
+  --of XML \
+  --sv 1.5
 ```
 
 **SBOM Contents:**
@@ -399,6 +400,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
       - name: Run Bandit
         run: bandit -r src/ -f json -o bandit-report.json
 
@@ -409,22 +424,65 @@ jobs:
         run: pip-audit --format json --output pip-audit-report.json
 
       - name: Generate SBOM
-        run: cyclonedx-py environment --outfile sbom.json
+        run: cyclonedx-py environment -o sbom.json --of JSON --sv 1.5
 
       - name: License Check
         run: licensecheck --format json > licenses.json
 ```
 
+### Trivy Security Scanner
+
+**Installation:**
+```bash
+# Linux (Debian/Ubuntu)
+sudo apt-get install wget apt-transport-https gnupg lsb-release
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+sudo apt-get update
+sudo apt-get install trivy
+
+# macOS
+brew install trivy
+
+# Using Docker
+docker run aquasec/trivy:latest
+```
+
+**Usage:**
+```bash
+# Scan filesystem (HIGH and CRITICAL only)
+make trivy-scan
+
+# Complete scan (all severities)
+make trivy-scan-full
+
+# Export to JSON
+make trivy-scan-json
+
+# Direct commands
+trivy fs --severity HIGH,CRITICAL .
+trivy fs --format json --output trivy-report.json .
+trivy fs --format sarif --output trivy-results.sarif .  # For GitHub Security
+```
+
+**What Trivy Scans:**
+- ✅ Python package vulnerabilities (CVEs)
+- ✅ OS package vulnerabilities (if Docker/container)
+- ✅ Misconfiguration (IaC security)
+- ✅ Secret detection (hardcoded credentials)
+- ✅ License scanning
+
 ### Manual Security Audit
 
 ```bash
-# Complete security audit
+# Complete security audit (Bandit, Safety, pip-audit, SBOM)
 make security-audit
 
 # Individual scans
-bandit -r src/ -ll  # Low severity and above
-safety check --full-report
-pip-audit --desc
+trivy fs --severity HIGH,CRITICAL .  # Comprehensive vulnerability scan
+bandit -r src/ -ll  # Python security linter
+safety check --full-report  # Known vulnerability database
+pip-audit --desc  # CVE scanning
 ```
 
 ### Vulnerability Response Process

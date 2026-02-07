@@ -50,6 +50,8 @@ dependencies.json
 bandit-report.json
 safety-report.json
 pip-audit-report.json
+trivy-report.json
+trivy-results.sarif
 
 # Environments
 .env

@@ -55,8 +55,8 @@ dependencies = [
     "asyncpg>=0.30.0,<1.0.0",
     # Caching & messaging
     "redis>=7.0.0,<8.0.0",
-    "aio-pika>=9.6.0,<10.0.0",  # RabbitMQ async client for message queue
-    "croniter>=6.0.2,<7.0.0",  # CRON expression parsing for job scheduler
+    "aio-pika>=9.5.8,<10.0.0",  # RabbitMQ async client for message queue
+    "croniter>=6.0.0,<7.0.0",  # CRON expression parsing for job scheduler
     "sse-starlette>=3.0.0,<4.0.0",  # Server-Sent Events for real-time streaming
     # Workflow engine
     "temporalio>=1.8.0,<2.0.0",
@@ -115,7 +115,7 @@ security = [
     # SBOM & License compliance (Enterprise)
     "cyclonedx-bom>=7.2.1,<8.0.0",  # CycloneDX SBOM generation (industry standard)
     "pip-licenses>=5.0.0,<6.0.0",  # License scanning and reporting
-    "licensecheck>=2025.1.4,<2026.0.0",  # License compatibility checking
+    "licensecheck>=2025.1.0,<2026.0.0",  # License compatibility checking
     # Dependency scanning
     "pipdeptree>=2.24.0,<3.0.0",  # Dependency tree visualization
 ]
