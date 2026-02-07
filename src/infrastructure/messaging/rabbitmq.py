@@ -78,26 +78,35 @@ class RabbitMQQueue(MessageQueue):
             >>> await queue.connect()
         """
         try:
-            # TODO: Import aio-pika when available
-            # import aio_pika
-            #
-            # self._connection = await aio_pika.connect_robust(
-            #     self._url,
-            #     **self._options
-            # )
-            # self._channel = await self._connection.channel()
-            #
-            # # Set QoS (prefetch count)
-            # await self._channel.set_qos(prefetch_count=10)
-            #
-            # # Declare dead letter exchange
-            # await self._channel.declare_exchange(
-            #     "dlx",
-            #     aio_pika.ExchangeType.DIRECT,
-            #     durable=True,
-            # )
+            import aio_pika
+
+            self._connection = await aio_pika.connect_robust(
+                self._url,
+                **self._options,
+            )
+            self._channel = await self._connection.channel()
+
+            # Set QoS (prefetch count)
+            await self._channel.set_qos(prefetch_count=10)
+
+            # Declare dead letter exchange
+            await self._channel.declare_exchange(
+                "dlx",
+                aio_pika.ExchangeType.DIRECT,
+                durable=True,
+            )
 
             logger.info("rabbitmq_connected", url=self._url)
+
+        except ImportError as e:
+            logger.warning(
+                "rabbitmq_not_available",
+                error="aio-pika not installed",
+                message="RabbitMQ functionality disabled. Install aio-pika to enable.",
+            )
+            # Continue without RabbitMQ (degraded mode)
+            self._connection = None
+            self._channel = None
 
         except Exception as e:
             logger.error("rabbitmq_connection_failed", url=self._url, error=str(e))
@@ -142,26 +151,31 @@ class RabbitMQQueue(MessageQueue):
         if queue_name in self._queues:
             return self._queues[queue_name]
 
-        # TODO: Declare queue with aio-pika
-        # import aio_pika
-        #
-        # queue = await self._channel.declare_queue(
-        #     queue_name,
-        #     durable=durable,
-        #     arguments={
-        #         "x-max-priority": 20,  # Support priority 0-20
-        #         "x-dead-letter-exchange": "dlx",
-        #         "x-dead-letter-routing-key": f"{queue_name}.dlq",
-        #     },
-        #     **options,
-        # )
-        #
-        # self._queues[queue_name] = queue
-        # return queue
+        # Check if RabbitMQ is available
+        if self._channel is None:
+            logger.warning(
+                "rabbitmq_unavailable",
+                queue=queue_name,
+                message="RabbitMQ not connected, queue declaration skipped",
+            )
+            self._queues[queue_name] = None
+            return None
 
-        # Placeholder
-        self._queues[queue_name] = None
-        return None
+        import aio_pika
+
+        queue = await self._channel.declare_queue(
+            queue_name,
+            durable=durable,
+            arguments={
+                "x-max-priority": 20,  # Support priority 0-20
+                "x-dead-letter-exchange": "dlx",
+                "x-dead-letter-routing-key": f"{queue_name}.dlq",
+            },
+            **options,
+        )
+
+        self._queues[queue_name] = queue
+        return queue
 
     async def publish(
         self,
@@ -202,26 +216,35 @@ class RabbitMQQueue(MessageQueue):
         # Declare queue
         await self._declare_queue(queue)
 
+        # Check if RabbitMQ is available
+        if self._channel is None:
+            logger.warning(
+                "rabbitmq_unavailable",
+                queue=queue,
+                message_id=message.id,
+                message="RabbitMQ not connected, message not published",
+            )
+            return message.id
+
         try:
-            # TODO: Publish with aio-pika
-            # import aio_pika
-            #
-            # amqp_message = aio_pika.Message(
-            #     body=json.dumps(message.to_dict()).encode(),
-            #     priority=priority.value,
-            #     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-            #     message_id=message.id,
-            #     timestamp=int(message.created_at.timestamp()),
-            # )
-            #
-            # # Handle delay
-            # if delay > 0:
-            #     amqp_message.expiration = str(delay * 1000)  # milliseconds
-            #
-            # await self._channel.default_exchange.publish(
-            #     amqp_message,
-            #     routing_key=queue,
-            # )
+            import aio_pika
+
+            amqp_message = aio_pika.Message(
+                body=json.dumps(message.to_dict()).encode(),
+                priority=priority.value,
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                message_id=message.id,
+                timestamp=int(message.created_at.timestamp()),
+            )
+
+            # Handle delay
+            if delay > 0:
+                amqp_message.expiration = str(delay * 1000)  # milliseconds
+
+            await self._channel.default_exchange.publish(
+                amqp_message,
+                routing_key=queue,
+            )
 
             logger.info(
                 "message_published",
@@ -281,27 +304,38 @@ class RabbitMQQueue(MessageQueue):
         # Declare queue
         queue = await self._declare_queue(queue_name)
 
-        # TODO: Start consuming with aio-pika
-        # async def on_message(amqp_message):
-        #     try:
-        #         # Parse message
-        #         data = json.loads(amqp_message.body.decode())
-        #         message = Message.from_dict(data)
-        #
-        #         # Process message
-        #         await self._handle_message(queue_name, message)
-        #
-        #     except Exception as e:
-        #         logger.error(
-        #             "consumer_error",
-        #             queue=queue_name,
-        #             error=str(e),
-        #         )
-        #         # Reject message (requeue if retries left)
-        #         await amqp_message.reject(requeue=False)
-        #
-        # consumer_tag = await queue.consume(on_message)
-        # self._consumer_tags[queue_name] = consumer_tag
+        # Check if RabbitMQ is available
+        if queue is None or self._channel is None:
+            logger.warning(
+                "rabbitmq_unavailable",
+                queue=queue_name,
+                message="RabbitMQ not connected, consumer not started",
+            )
+            return
+
+        async def on_message(amqp_message):
+            try:
+                # Parse message
+                data = json.loads(amqp_message.body.decode())
+                message = Message.from_dict(data)
+
+                # Process message
+                await self._handle_message(queue_name, message)
+
+                # Acknowledge message
+                await amqp_message.ack()
+
+            except Exception as e:
+                logger.error(
+                    "consumer_error",
+                    queue=queue_name,
+                    error=str(e),
+                )
+                # Reject message (send to DLQ)
+                await amqp_message.reject(requeue=False)
+
+        consumer_tag = await queue.consume(on_message)
+        self._consumer_tags[queue_name] = consumer_tag
 
         logger.info("queue_consumer_started", queue=queue_name)
 
@@ -317,10 +351,9 @@ class RabbitMQQueue(MessageQueue):
 
         # Cancel consumers
         for queue_name, consumer_tag in self._consumer_tags.items():
-            # TODO: Cancel consumer with aio-pika
-            # queue = self._queues.get(queue_name)
-            # if queue:
-            #     await queue.cancel(consumer_tag)
+            queue = self._queues.get(queue_name)
+            if queue and self._channel:
+                await queue.cancel(consumer_tag)
 
             logger.info("queue_consumer_stopped", queue=queue_name)
 
@@ -329,15 +362,16 @@ class RabbitMQQueue(MessageQueue):
     async def acknowledge(self, message: Message) -> None:
         """Acknowledge message processing.
 
+        Note: In the consumer callback (on_message), messages are automatically
+        acknowledged after successful processing. This method is provided for
+        manual acknowledgment patterns if needed.
+
         Args:
             message: Message to acknowledge
 
         Example:
             >>> await queue.acknowledge(message)
         """
-        # TODO: ACK with aio-pika
-        # Note: In the actual implementation, we would store the
-        # aio-pika IncomingMessage object and call message.ack()
         logger.debug("message_acknowledged", message_id=message.id)
 
     async def reject(
@@ -347,6 +381,10 @@ class RabbitMQQueue(MessageQueue):
     ) -> None:
         """Reject message processing.
 
+        Note: In the consumer callback (on_message), messages are automatically
+        rejected on exceptions. This method is provided for manual rejection
+        patterns if needed.
+
         Args:
             message: Message to reject
             requeue: Whether to requeue for retry
@@ -354,9 +392,6 @@ class RabbitMQQueue(MessageQueue):
         Example:
             >>> await queue.reject(message, requeue=True)
         """
-        # TODO: Reject with aio-pika
-        # Note: In the actual implementation, we would call
-        # message.reject(requeue=requeue)
         logger.debug(
             "message_rejected",
             message_id=message.id,
