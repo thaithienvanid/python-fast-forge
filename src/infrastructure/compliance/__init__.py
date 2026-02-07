@@ -17,13 +17,18 @@ Example:
     >>> compliance = ComplianceManager()
     >>> await compliance.initialize()
     >>> is_compliant = await compliance.verify_all_controls()
+    >>>
+    >>> # Or use individual frameworks
+    >>> from src.infrastructure.compliance import HIPAACompliance
+    >>> hipaa = HIPAACompliance()
+    >>> encrypted = await hipaa.encrypt_phi(data, user_id="user123")
 """
 
-from src.infrastructure.compliance.hipaa import HIPAACompliance
 from src.infrastructure.compliance.gdpr import GDPRCompliance
+from src.infrastructure.compliance.hipaa import HIPAACompliance
 from src.infrastructure.compliance.iso27001 import ISO27001Compliance
-from src.infrastructure.compliance.soc2 import SOC2Compliance
 from src.infrastructure.compliance.manager import ComplianceManager
+from src.infrastructure.compliance.soc2 import SOC2Compliance
 
 __all__ = [
     "ComplianceManager",
