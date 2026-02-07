@@ -17,7 +17,7 @@ from uuid import UUID
 from sqlalchemy import Column, DateTime, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 
-from src.infrastructure.persistence.database import Base
+from src.domain.models.base import Base
 
 
 class EventStoreEntry(Base):
@@ -108,7 +108,7 @@ class EventStoreEntry(Base):
         nullable=False,
         comment="Full event payload as JSON",
     )
-    metadata = Column(
+    event_metadata = Column(
         JSONB,
         default={},
         comment="Additional metadata (causation_id, correlation_id, user_id, etc.)",
@@ -135,27 +135,23 @@ class EventStoreEntry(Base):
             "ix_event_store_aggregate",
             "aggregate_type",
             "aggregate_id",
-            comment="Index for aggregate event stream reconstruction",
         ),
         # Index for temporal queries
         Index(
             "ix_event_store_occurred_at",
             "occurred_at",
-            comment="Index for time-based queries",
         ),
         # Index for event type filtering
         Index(
             "ix_event_store_event_type",
             "event_type",
-            comment="Index for event type queries",
         ),
-        # Unique constraint for optimistic locking
+        # Unique constraint for optimistic locking (prevents concurrent updates)
         Index(
             "ix_event_store_aggregate_version_unique",
             "aggregate_id",
             "aggregate_version",
             unique=True,
-            comment="Unique constraint for optimistic locking (prevents concurrent updates)",
         ),
     )
 
