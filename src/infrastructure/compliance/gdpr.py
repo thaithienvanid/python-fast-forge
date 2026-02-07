@@ -502,8 +502,15 @@ class GDPRCompliance:
         # Format data (simplified - would need proper CSV/XML serialization)
         if format == "json":
             import json
+            from datetime import datetime
 
-            return json.dumps(data, indent=2)
+            def default_serializer(obj):
+                """Handle datetime serialization."""
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+            return json.dumps(data, indent=2, default=default_serializer)
         elif format == "csv":
             # Simplified CSV export
             return "CSV export not fully implemented"

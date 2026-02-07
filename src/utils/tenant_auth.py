@@ -14,7 +14,8 @@ import time
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from jose import JWTError, jwt
+from authlib.jose import JoseError, jwt
+from authlib.jose.errors import ExpiredTokenError, InvalidTokenError
 from structlog import get_logger
 
 from src.domain.tenant_claims import TenantTokenClaims
@@ -22,6 +23,9 @@ from src.infrastructure.config import Settings, get_settings
 
 
 logger = get_logger(__name__)
+
+# Create alias for backward compatibility
+JWTError = JoseError
 
 
 def create_tenant_token(
@@ -80,11 +84,13 @@ def create_tenant_token(
     # Get signing key
     private_key = settings.get_jwt_private_key()
 
-    # Encode token with ES256
+    # Encode token with ES256 using authlib
+    # authlib.jose.jwt.encode requires header parameter
+    header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
     token = jwt.encode(
+        header,
         payload,
         private_key,
-        algorithm=settings.jwt_algorithm,
     )
 
     logger.debug(
@@ -131,17 +137,15 @@ def decode_tenant_token(
     # Get verification key
     public_key = settings.get_jwt_public_key()
 
-    # Decode with validation
-    payload = jwt.decode(
-        token,
-        public_key,
-        algorithms=[settings.jwt_algorithm],
-        options={
-            "verify_signature": True,
-            "verify_exp": True,
-            "verify_iat": True,
-        },
-    )
+    # Decode with validation using authlib
+    # authlib.jose.jwt.decode returns JWTClaims object
+    jwt_claims = jwt.decode(token, public_key)
+
+    # Validate the claims (checks exp, iat, etc.)
+    jwt_claims.validate()
+
+    # Convert JWTClaims to dict for processing
+    payload = dict(jwt_claims)
 
     # Convert to claims model
     claims = TenantTokenClaims.from_jwt_payload(payload)

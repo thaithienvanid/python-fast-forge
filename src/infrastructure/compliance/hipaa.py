@@ -40,8 +40,6 @@ from enum import Enum
 from typing import Any
 
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
 from pydantic import BaseModel, Field
 
 from src.infrastructure.logging.config import get_logger

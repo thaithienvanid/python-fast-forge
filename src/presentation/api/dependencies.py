@@ -4,13 +4,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, status
-from jose import JWTError
+from authlib.jose import JoseError
 from pydantic import ValidationError
 from structlog import get_logger
 
 from src.infrastructure.config import Settings, get_settings
 from src.presentation.schemas.error import ErrorDetail
 from src.utils.tenant_auth import decode_tenant_token
+
+# Alias for backward compatibility
+JWTError = JoseError
 
 
 logger = get_logger(__name__)
