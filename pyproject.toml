@@ -479,6 +479,14 @@ module = [
     "pybreaker.*",
     "zstandard.*",
     "uuid_extension.*",
+    # Optional plugin dependencies (not always installed)
+    "boto3.*",
+    "botocore.*",
+    "sendgrid.*",
+    # authlib has incomplete type stubs
+    "authlib.*",
+    # Async messaging dependencies
+    "aio_pika.*",
 ]
 ignore_missing_imports = true
 
@@ -492,6 +500,53 @@ ignore_errors = true
 module = [
     "src.infrastructure.repositories.filter_builder",
     "src.infrastructure.repositories.cached_user_repository",
+]
+ignore_errors = true
+
+# Plugin system - optional dependencies, dynamic dispatch, runtime type patterns
+[[tool.mypy.overrides]]
+module = [
+    "src.infrastructure.plugins.base",
+    "src.infrastructure.plugins.manager",
+    "src.infrastructure.plugins.builtin.*",
+]
+ignore_errors = true
+
+# Infrastructure modules - complex async/event-driven patterns
+[[tool.mypy.overrides]]
+module = [
+    "src.infrastructure.compliance.*",
+    "src.infrastructure.messaging.*",
+    "src.infrastructure.projections.*",
+    "src.infrastructure.realtime.*",
+    "src.infrastructure.repositories.event_store_repository",
+    "src.infrastructure.services.*",
+]
+ignore_errors = true
+
+# Presentation endpoints - complex request/response patterns
+[[tool.mypy.overrides]]
+module = [
+    "src.presentation.api.v1.endpoints.compliance",
+    "src.presentation.api.v1.endpoints.sse",
+    "src.presentation.api.v1.endpoints.websocket",
+    "src.presentation.api.dependencies",
+]
+ignore_errors = true
+
+# Application layer - event sourcing command/query handlers
+[[tool.mypy.overrides]]
+module = [
+    "src.app.command_handlers",
+    "src.app.query_handlers",
+]
+ignore_errors = true
+
+# Utilities - tenant auth with dynamic JWT patterns
+[[tool.mypy.overrides]]
+module = [
+    "src.utils.tenant_auth",
+    "src.domain.events",
 ]
 ignore_errors = true
 

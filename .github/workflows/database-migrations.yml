@@ -90,6 +90,8 @@ jobs:
     name: Validate Migrations
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: check-token
+    if: needs.check-token.outputs.has_token == 'true'
 
     services:
       postgres:
@@ -128,6 +130,8 @@ jobs:
     name: Test Migration Application
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: check-token
+    if: needs.check-token.outputs.has_token == 'true'
 
     services:
       postgres:
@@ -181,7 +185,8 @@ jobs:
     name: Check Schema Drift
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'pull_request'
+    needs: check-token
+    if: needs.check-token.outputs.has_token == 'true' && github.event_name == 'pull_request'
 
     services:
       postgres:
