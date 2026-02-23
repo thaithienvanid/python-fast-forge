@@ -130,6 +130,38 @@ jobs:
           python-version: ${{ matrix.python-version }}
           dependency-groups: dev test
 
+      - name: Verify service connectivity
+        run: |
+          echo "Checking PostgreSQL..."
+          timeout 10 bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done' || {
+            echo "::error::PostgreSQL is not ready"
+            docker ps
+            exit 1
+          }
+
+          echo "Checking Redis..."
+          timeout 10 bash -c 'until nc -z localhost 6379; do sleep 1; done' || {
+            echo "::error::Redis is not ready"
+            docker ps
+            exit 1
+          }
+
+          echo "✅ All services are ready"
+
+      - name: Verify dependencies installed
+        run: |
+          echo "Checking critical dependencies..."
+          uv pip list | grep -E "dependency-injector|fastapi|sqlalchemy|pytest" || true
+          echo ""
+          echo "Python version:"
+          python --version
+          echo ""
+          echo "Attempting test imports..."
+          python -c "import dependency_injector; print('✅ dependency_injector imported')" || echo "❌ dependency_injector failed"
+          python -c "import fastapi; print('✅ fastapi imported')" || echo "❌ fastapi failed"
+          python -c "import sqlalchemy; print('✅ sqlalchemy imported')" || echo "❌ sqlalchemy failed"
+          python -c "import pytest; print('✅ pytest imported')" || echo "❌ pytest failed"
+
       - name: Run unit tests
         run: |
           uv run pytest tests/unit/ \
