@@ -180,10 +180,11 @@ def cache_error_from_exception(
     """
     import asyncio  # noqa: PLC0415
 
+    # Check TimeoutError first since it's a subclass of OSError in Python 3+
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return CacheTimeoutError(key, 0.0)
     if isinstance(exc, (ConnectionError, OSError)):
         return CacheConnectionError(key, exc)
-    if isinstance(exc, asyncio.TimeoutError):
-        return CacheTimeoutError(key, 0.0)
     if isinstance(exc, (ValueError, TypeError)):
         return CacheSerializationError(key or "unknown", operation, exc)
 

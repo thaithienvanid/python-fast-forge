@@ -94,6 +94,16 @@ class Settings(BaseSettings):
         self.security.is_production = is_prod
         self.external_services.is_production = is_prod
 
+        # Validate email_api_key in production (runs after is_production is synced)
+        if is_prod and (
+            "dev-email" in self.external_services.email_api_key.lower()
+            or "unsafe" in self.external_services.email_api_key.lower()
+        ):
+            raise ValueError(
+                "EMAIL_API_KEY must be set to a real API key in production. "
+                "Default development key is not allowed."
+            )
+
     # Backward compatibility properties for commonly accessed settings
     @property
     def app_name(self) -> str:
@@ -166,6 +176,11 @@ class Settings(BaseSettings):
         """Backward compatibility: database_echo."""
         return self.database.database_echo
 
+    @database_echo.setter
+    def database_echo(self, value: bool) -> None:
+        """Setter for database_echo to allow test fixtures to modify it."""
+        self.database.database_echo = value
+
     @property
     def database_pool_size(self) -> int:
         """Backward compatibility: database_pool_size."""
@@ -182,7 +197,34 @@ class Settings(BaseSettings):
         """Backward compatibility: log_level."""
         return self.app.log_level
 
+    @property
+    def port(self) -> int:
+        """Backward compatibility: port."""
+        return self.app.port
+
+    @property
+    def host(self) -> str:
+        """Backward compatibility: host."""
+        return self.app.host
+
     # Security backward compatibility
+    @property
+    def secret_key(self) -> str | None:
+        """Backward compatibility: secret_key."""
+        return self.security.secret_key
+
+    @secret_key.setter
+    def secret_key(self, value: str | None) -> None:
+        """Setter for secret_key to allow test fixtures to modify it."""
+        self.security.secret_key = value
+
+    # External services backward compatibility
+    @property
+    def email_api_key(self) -> str:
+        """Backward compatibility: email_api_key."""
+        return self.external_services.email_api_key
+
+    # Security backward compatibility (continued)
     @property
     def rate_limit_enabled(self) -> bool:
         """Backward compatibility: rate_limit_enabled."""

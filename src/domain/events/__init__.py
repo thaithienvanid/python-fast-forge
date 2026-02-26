@@ -60,8 +60,8 @@ def register_event(event_type: str):
 
     def decorator(cls: type[DomainEvent]) -> type[DomainEvent]:
         EVENT_REGISTRY[event_type] = cls
-        # Set event_type as class attribute for convenience
-        cls.event_type = event_type  # type: ignore
+        # Don't set event_type as class attribute - it would shadow the property
+        # from DomainEvent base class that returns cls.__name__
         return cls
 
     return decorator

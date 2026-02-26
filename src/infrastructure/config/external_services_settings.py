@@ -80,18 +80,20 @@ class ExternalServicesSettings(BaseSettings):
     @field_validator("email_api_key")
     @classmethod
     def validate_email_api_key(cls, v: str, info: Any) -> str:
-        """Validate email API key in production for API-based providers."""
+        """Validate email API key in production."""
         is_production = info.data.get("is_production", False)
         email_provider = info.data.get("email_provider", "smtp")
 
-        # Only validate API key for API-based providers
-        if (
-            is_production
-            and email_provider in ["sendgrid", "ses", "mailgun"]
-            and ("dev-email" in v.lower() or "unsafe" in v.lower())
-        ):
-            raise ValueError(
-                f"EMAIL_API_KEY must be set to a real API key in production for {email_provider}. "
-                "Default development key is not allowed."
-            )
+        # Validate that dev keys are not used in production
+        if is_production and ("dev-email" in v.lower() or "unsafe" in v.lower()):
+            if email_provider in ["sendgrid", "ses", "mailgun"]:
+                raise ValueError(
+                    f"EMAIL_API_KEY must be set to a real API key in production for {email_provider}. "
+                    "Default development key is not allowed."
+                )
+            else:
+                raise ValueError(
+                    "EMAIL_API_KEY must be set to a real API key in production. "
+                    "Default development key is not allowed."
+                )
         return v
