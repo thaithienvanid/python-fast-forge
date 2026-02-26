@@ -91,9 +91,8 @@ class ExternalServicesSettings(BaseSettings):
                     f"EMAIL_API_KEY must be set to a real API key in production for {email_provider}. "
                     "Default development key is not allowed."
                 )
-            else:
-                raise ValueError(
-                    "EMAIL_API_KEY must be set to a real API key in production. "
-                    "Default development key is not allowed."
-                )
+            raise ValueError(
+                "EMAIL_API_KEY must be set to a real API key in production. "
+                "Default development key is not allowed."
+            )
         return v
