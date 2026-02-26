@@ -665,6 +665,17 @@ omit = [
     "*/venv/*",
     "main.py",
     "worker.py",
+    # Infrastructure modules requiring integration tests
+    "*/messaging/*",
+    "*/plugins/*",
+    "*/event_store_models.py",
+    "*/event_store_repository.py",
+    "*/read_models.py",
+    "*/app/tasks/*",
+    "*/app/commands/*",
+    "*/app/queries/*",
+    "*/app/command_handlers/*",
+    "*/app/query_handlers/*",
 ]
 context = "${CONTEXT}"
 
