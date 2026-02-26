@@ -177,7 +177,13 @@ class WebSocketManager:
                     # Create async task to unsubscribe from the room channel
                     import asyncio  # noqa: PLC0415
 
-                    asyncio.create_task(self._pubsub.unsubscribe(f"room:{room}"))
+                    # Store task reference to prevent garbage collection (fire-and-forget cleanup)
+                    task = asyncio.create_task(self._pubsub.unsubscribe(f"room:{room}"))
+                    # Add done callback to remove from set when complete
+                    if not hasattr(self, "_background_tasks"):
+                        self._background_tasks = set()
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
                 except RuntimeError:
                     # No running event loop; skip async unsubscribe
                     pass
