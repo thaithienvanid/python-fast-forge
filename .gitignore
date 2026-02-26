@@ -94,3 +94,6 @@ dmypy.json
 tmp/
 temp/
 *.tmp
+
+# Development JWT keys (auto-generated)
+.dev_jwt_private_key.pem

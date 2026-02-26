@@ -12,10 +12,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from jose import JWTError
 
 from src.infrastructure.config import Settings
 from src.utils.tenant_auth import (
+    JWTError,
     create_tenant_token,
     decode_tenant_token,
     get_token_expiration,

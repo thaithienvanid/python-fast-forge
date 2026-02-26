@@ -86,11 +86,14 @@ def create_tenant_token(
     # Encode token with ES256 using authlib
     # authlib.jose.jwt.encode requires header parameter
     header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
-    token = jwt.encode(
+    token_bytes = jwt.encode(
         header,
         payload,
         private_key,
     )
+
+    # authlib returns bytes, decode to string
+    token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
 
     logger.debug(
         "tenant_token_created",
