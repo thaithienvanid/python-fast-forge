@@ -55,6 +55,13 @@ class SecuritySettings(BaseSettings):
         description="Secret key for API signature authentication (X-API-Signature header validation)",
     )
 
+    # Compliance Data Encryption
+    compliance_encryption_key: str | None = Field(
+        default=None,
+        alias="COMPLIANCE_ENCRYPTION_KEY",
+        description="32-byte (or longer) encryption key for compliance data (GDPR, HIPAA, etc.). Required length: 32 bytes minimum.",
+    )
+
     # CORS configuration
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
@@ -187,38 +194,23 @@ class SecuritySettings(BaseSettings):
                     raise ValueError(f"JWT private key file not found: {self.jwt_private_key_path}")
                 return private_key_path.read_text()
 
-            # Priority 3: Development - generate and persist ephemeral key
+            # Priority 3: Development - generate ephemeral in-memory key
             if not self.is_production:
-                # Check for existing ephemeral key file
-                ephemeral_key_path = Path(".dev_jwt_private_key.pem")
-
-                if ephemeral_key_path.exists():
-                    # Load existing ephemeral key
-                    return ephemeral_key_path.read_text()
-
-                # Generate new ephemeral key and persist it
+                # Generate ephemeral key (process-scoped, not persisted)
+                # This avoids filesystem writes and is more secure for development
                 from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
 
-                private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-                pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.NoEncryption(),
-                )
-                pem_str = pem.decode("utf-8")
+                # Check if we already generated one for this instance
+                if not hasattr(self, "_ephemeral_private_key"):
+                    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+                    pem = private_key.private_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PrivateFormat.PKCS8,
+                        encryption_algorithm=serialization.NoEncryption(),
+                    )
+                    self._ephemeral_private_key = pem.decode("utf-8")
 
-                # Save to file for persistence across restarts
-                ephemeral_key_path.write_text(pem_str)
-                # Add to .gitignore to prevent accidental commit
-                gitignore_path = Path(".gitignore")
-                if gitignore_path.exists():
-                    gitignore_content = gitignore_path.read_text()
-                    if ".dev_jwt_private_key.pem" not in gitignore_content:
-                        with gitignore_path.open("a") as f:
-                            f.write("\n# Development JWT keys (auto-generated)\n")
-                            f.write(".dev_jwt_private_key.pem\n")
-
-                return pem_str
+                return self._ephemeral_private_key
 
             raise ValueError(
                 "JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_PATH must be set in production for ES256 algorithm"

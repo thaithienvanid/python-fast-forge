@@ -46,12 +46,16 @@ def get_compliance_manager() -> ComplianceManager:
     global _compliance_manager
     if _compliance_manager is None:
         settings = get_settings()
-        # Use encryption key from settings if available, otherwise generate
-        encryption_key = (
-            settings.security.jwt_secret_key.encode()[:32]
-            if hasattr(settings.security, "jwt_secret_key")
-            else None
-        )
+        # Use dedicated compliance encryption key from settings
+        encryption_key = None
+        if settings.security.compliance_encryption_key:
+            # Validate key length (must be at least 32 bytes)
+            key_bytes = settings.security.compliance_encryption_key.encode()
+            if len(key_bytes) < 32:
+                raise ValueError(
+                    f"COMPLIANCE_ENCRYPTION_KEY must be at least 32 bytes, got {len(key_bytes)} bytes"
+                )
+            encryption_key = key_bytes[:32]  # Use first 32 bytes for AES-256
         _compliance_manager = ComplianceManager(encryption_key=encryption_key)
     return _compliance_manager
 

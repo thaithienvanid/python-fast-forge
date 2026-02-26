@@ -90,16 +90,28 @@ async def get_redis() -> Redis:
     return _redis_pool
 
 
+# Global WebSocketManager singleton
+_websocket_manager: WebSocketManager | None = None
+
+
 async def get_websocket_manager(redis: Redis = Depends(get_redis)) -> WebSocketManager:
-    """Get WebSocket manager from dependency injection.
+    """Get WebSocket manager singleton from dependency injection.
+
+    Returns the same WebSocketManager instance for all connections to ensure
+    room broadcasting works correctly and stats are accurate across connections.
 
     Args:
         redis: Redis connection (injected)
 
     Returns:
-        WebSocketManager instance
+        Singleton WebSocketManager instance
     """
-    return WebSocketManager(redis)
+    global _websocket_manager
+    if _websocket_manager is None:
+        _websocket_manager = WebSocketManager(redis)
+        # Start the pub/sub listener (should be done once at startup)
+        # Note: This assumes the listener is started automatically or will be started
+    return _websocket_manager
 
 
 async def authenticate_websocket(token: str) -> tuple[UUID, UUID]:

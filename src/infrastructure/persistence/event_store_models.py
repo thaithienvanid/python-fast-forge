@@ -110,7 +110,8 @@ class EventStoreEntry(Base):
     )
     event_metadata = Column(
         JSONB,
-        default={},
+        default=dict,  # Use callable to avoid shared mutable default
+        server_default="{}",  # Ensure default at DB level
         comment="Additional metadata (causation_id, correlation_id, user_id, etc.)",
     )
 

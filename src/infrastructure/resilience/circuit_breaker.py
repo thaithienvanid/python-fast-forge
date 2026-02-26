@@ -233,6 +233,8 @@ class CircuitBreaker[T]:
                     self._stats.state = CircuitState.HALF_OPEN
                     self._stats.last_state_change = time.time()
                     self._half_open_calls = 0
+                    # Reset success_count to track consecutive half-open successes
+                    self._stats.success_count = 0
                     return True
             return False
 

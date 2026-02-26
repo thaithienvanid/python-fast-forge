@@ -37,9 +37,10 @@ class TestAPIPerformance:
 
             assert response.status_code == 200
 
-        # Calculate percentiles
+        # Calculate percentiles (use method="inclusive" to handle small sample sizes)
         p50 = median(times)
-        p95, p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
+        percentiles = quantiles(times, n=100, method="inclusive")
+        p95, p99 = percentiles[94], percentiles[98]
 
         # Assert performance targets
         assert p50 < 50, f"p50 should be < 50ms, got {p50:.2f}ms"
@@ -65,9 +66,10 @@ class TestAPIPerformance:
 
             assert response.status_code in [200, 401, 403]  # May require auth
 
-        # Calculate percentiles
+        # Calculate percentiles (use method="inclusive" to handle small sample sizes)
         p50 = median(times)
-        p95, _p99 = quantiles(times, n=100)[94], quantiles(times, n=100)[98]
+        percentiles = quantiles(times, n=100, method="inclusive")
+        p95, _p99 = percentiles[94], percentiles[98]
 
         # Assert performance targets
         assert p50 < 100, f"p50 should be < 100ms, got {p50:.2f}ms"
@@ -100,9 +102,9 @@ class TestAPIPerformance:
             # May succeed or fail with validation/auth - that's ok for benchmark
             assert response.status_code in [201, 400, 401, 403, 422]
 
-        # Calculate percentiles
+        # Calculate percentiles (use method="inclusive" to handle small sample sizes)
         p50 = median(times)
-        p95 = quantiles(times, n=100)[94] if len(times) >= 20 else max(times)
+        p95 = quantiles(times, n=100, method="inclusive")[94]
 
         # Assert performance targets (more lenient for writes)
         assert p50 < 150, f"p50 should be < 150ms, got {p50:.2f}ms"

@@ -280,7 +280,7 @@ def test_creates_valid_tenant_token():
 **Example: Testing Token Expiration**
 
 ```python
-from jose import JWTError
+from src.utils.tenant_auth import JWTError
 
 def test_raises_error_for_expired_token():
     """Test that expired tokens raise JWTError.

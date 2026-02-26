@@ -158,9 +158,29 @@ class WebSocketManager:
             if not self._user_connections[user_id]:
                 del self._user_connections[user_id]
 
-        # Remove from all rooms
-        for room_connections in self._rooms.values():
-            room_connections.discard(connection_id)
+        # Remove from all rooms and clean up empty rooms
+        rooms_to_cleanup: list[str] = []
+        for room, room_connections in list(self._rooms.items()):
+            if connection_id in room_connections:
+                room_connections.discard(connection_id)
+                # Mark empty rooms for cleanup
+                if not room_connections:
+                    rooms_to_cleanup.append(room)
+
+        # Clean up empty rooms and unsubscribe from Redis channels
+        for room in rooms_to_cleanup:
+            # Delete empty room entry
+            self._rooms.pop(room, None)
+            # Unsubscribe from Redis pub/sub channel for this room
+            if hasattr(self, "_pubsub") and self._pubsub is not None:
+                try:
+                    # Create async task to unsubscribe from the room channel
+                    import asyncio  # noqa: PLC0415
+
+                    asyncio.create_task(self._pubsub.unsubscribe(f"room:{room}"))
+                except RuntimeError:
+                    # No running event loop; skip async unsubscribe
+                    pass
 
         logger.info(
             "websocket_disconnected",
