@@ -494,7 +494,7 @@ class TestEventRegistry:
         @register_event("test.custom_event")
         class CustomEvent(DomainEvent):
             test_field: str = Field(...)
-            
+
             @property
             def aggregate_id(self) -> UUID:
                 return self.event_id
@@ -505,6 +505,7 @@ class TestEventRegistry:
 
         # Clean up
         from src.domain.events import EVENT_REGISTRY
+
         del EVENT_REGISTRY["test.custom_event"]
 
     def test_all_user_events_are_registered(self):
