@@ -463,3 +463,69 @@ class TestUserEvents:
 
         assert event.user_id == user_id
         assert event.restored_at == restored_at
+
+
+class TestEventRegistry:
+    """Tests for event registry functionality."""
+
+    def test_get_event_class_for_registered_event(self):
+        """Can retrieve event class for registered event type."""
+        from src.domain.events import get_event_class
+
+        event_class = get_event_class("user.created")
+        assert event_class == UserCreatedEvent
+
+    def test_get_event_class_raises_for_unregistered_event(self):
+        """get_event_class raises KeyError for unregistered type."""
+        from src.domain.events import get_event_class
+
+        with pytest.raises(KeyError) as exc_info:
+            get_event_class("unregistered.event")
+
+        assert "unregistered.event" in str(exc_info.value)
+        assert "not registered" in str(exc_info.value)
+
+    def test_register_event_decorator(self):
+        """register_event decorator adds event to registry."""
+        from src.domain.events import DomainEvent, register_event, get_event_class
+        from pydantic import Field
+        from uuid import UUID
+
+        @register_event("test.custom_event")
+        class CustomEvent(DomainEvent):
+            test_field: str = Field(...)
+            
+            @property
+            def aggregate_id(self) -> UUID:
+                return self.event_id
+
+        # Should be able to retrieve it
+        event_class = get_event_class("test.custom_event")
+        assert event_class == CustomEvent
+
+        # Clean up
+        from src.domain.events import EVENT_REGISTRY
+        del EVENT_REGISTRY["test.custom_event"]
+
+    def test_all_user_events_are_registered(self):
+        """All user events are registered in the registry."""
+        from src.domain.events import get_event_class
+
+        event_types = [
+            ("user.created", UserCreatedEvent),
+            ("user.updated", UserUpdatedEvent),
+            ("user.deleted", UserDeletedEvent),
+            ("user.restored", UserRestoredEvent),
+        ]
+
+        for event_type, expected_class in event_types:
+            event_class = get_event_class(event_type)
+            assert event_class == expected_class
+
+    def test_event_registry_is_dict(self):
+        """EVENT_REGISTRY is a dict mapping strings to classes."""
+        from src.domain.events import EVENT_REGISTRY
+
+        assert isinstance(EVENT_REGISTRY, dict)
+        assert len(EVENT_REGISTRY) >= 4  # At least our 4 user events
+        assert all(isinstance(k, str) for k in EVENT_REGISTRY.keys())
