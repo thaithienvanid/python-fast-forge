@@ -1,6 +1,6 @@
 """Unit tests for read models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.infrastructure.persistence.read_models import UserReadModel
@@ -13,7 +13,7 @@ class TestUserReadModel:
         """Can create read model instance with required fields."""
         user_id = uuid4()
         tenant_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         model = UserReadModel(
             id=user_id,
@@ -46,7 +46,7 @@ class TestUserReadModel:
     def test_read_model_repr(self):
         """Repr includes key fields."""
         user_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         model = UserReadModel(
             id=user_id,
@@ -71,7 +71,7 @@ class TestUserReadModel:
     def test_read_model_defaults(self):
         """Read model uses default values."""
         user_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         model = UserReadModel(
             id=user_id,

@@ -1,6 +1,6 @@
 """Unit tests for CQRS query models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -21,7 +21,7 @@ class TestUserQueryModel:
     def test_creates_model_with_all_required_fields(self):
         """Model creation succeeds with all required fields."""
         user_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         model = UserQueryModel(
             id=user_id,
@@ -49,7 +49,7 @@ class TestUserQueryModel:
     def test_creates_model_with_defaults(self):
         """Model uses default values for optional fields."""
         user_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         model = UserQueryModel(
             id=user_id,
@@ -74,15 +74,15 @@ class TestUserQueryModel:
                 id=uuid4(),
                 email="not-an-email",
                 username="testuser",
-                created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
         assert "email" in str(exc_info.value)
 
     def test_profile_completion_validates_range(self):
         """Profile completion must be between 0 and 100."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Test valid values
         for value in [0, 50, 100]:
@@ -123,7 +123,7 @@ class TestUserListQuery:
     def test_creates_query_with_all_filters(self):
         """Query creation succeeds with all filters."""
         tenant_id = uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         query = UserListQuery(
             tenant_id=tenant_id,
@@ -343,4 +343,4 @@ class TestQueryImmutability:
             # Attempt to modify should raise error
             with pytest.raises((ValidationError, AttributeError)):
                 # Try to set an arbitrary attribute
-                setattr(query, "new_field", "value")
+                query.new_field = "value"
