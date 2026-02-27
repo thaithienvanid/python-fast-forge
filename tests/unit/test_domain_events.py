@@ -487,9 +487,11 @@ class TestEventRegistry:
 
     def test_register_event_decorator(self):
         """register_event decorator adds event to registry."""
-        from src.domain.events import DomainEvent, register_event, get_event_class
-        from pydantic import Field
         from uuid import UUID
+
+        from pydantic import Field
+
+        from src.domain.events import DomainEvent, get_event_class, register_event
 
         @register_event("test.custom_event")
         class CustomEvent(DomainEvent):
@@ -529,4 +531,4 @@ class TestEventRegistry:
 
         assert isinstance(EVENT_REGISTRY, dict)
         assert len(EVENT_REGISTRY) >= 4  # At least our 4 user events
-        assert all(isinstance(k, str) for k in EVENT_REGISTRY.keys())
+        assert all(isinstance(k, str) for k in EVENT_REGISTRY)
