@@ -9,7 +9,7 @@ Complete guide to testing in this project.
 
 ### Overall Coverage
 - **Total Tests**: 1,069 (865 unit + 204 integration)
-- **Overall Coverage**: 84.23% (target: 90%)
+- **Overall Coverage**: 84.18% (target: 90%)
 - **Passing Rate**: 99.6% (1,065 passed, 4 skipped)
 
 ### Coverage by Module
@@ -280,14 +280,14 @@ def test_creates_valid_tenant_token():
 **Example: Testing Token Expiration**
 
 ```python
-from authlib.jose import JoseError
+from jose import JWTError
 
 def test_raises_error_for_expired_token():
-    """Test that expired tokens raise JoseError.
+    """Test that expired tokens raise JWTError.
 
     Arrange: Create token with negative expiration
     Act: Attempt to decode expired token
-    Assert: JoseError is raised
+    Assert: JWTError is raised
     """
     # Arrange
     tenant_id = uuid4()
@@ -297,7 +297,7 @@ def test_raises_error_for_expired_token():
     )
 
     # Act & Assert
-    with pytest.raises(JoseError):
+    with pytest.raises(JWTError):
         decode_tenant_token(token)
 ```
 

@@ -7,6 +7,7 @@ from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
 
 from src.infrastructure.logging.config import get_logger
+from src.infrastructure.services import get_email_service
 
 
 logger = get_logger(__name__)
@@ -26,11 +27,41 @@ async def send_welcome_email_activity(user_id: str, email: str) -> dict[str, Any
     try:
         logger.info("sending_welcome_email", user_id=user_id, email=email)
 
-        # TODO: Implement actual email sending logic
-        # For now, just simulate the activity
+        # Get email service
+        email_service = get_email_service()
 
-        logger.info("welcome_email_sent", user_id=user_id, email=email)
-        return {"status": "success", "user_id": user_id, "email": email}
+        # Send welcome email
+        message_id = await email_service.send_email(
+            to=email,
+            subject="Welcome to Python Fast Forge!",
+            body=f"""
+                <html>
+                <body>
+                    <h1>Welcome to Python Fast Forge!</h1>
+                    <p>Hi there,</p>
+                    <p>Thank you for joining our platform. We're excited to have you on board!</p>
+                    <p>Your user ID is: <code>{user_id}</code></p>
+                    <p>If you have any questions, feel free to reach out to our support team.</p>
+                    <br>
+                    <p>Best regards,<br>The Python Fast Forge Team</p>
+                </body>
+                </html>
+            """,
+            html=True,
+        )
+
+        logger.info(
+            "welcome_email_sent",
+            user_id=user_id,
+            email=email,
+            message_id=message_id,
+        )
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "email": email,
+            "message_id": message_id,
+        }
     except Exception as exc:
         logger.error("welcome_email_failed", user_id=user_id, error=str(exc))
         raise

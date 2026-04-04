@@ -1,87 +1,22 @@
-"""Application configuration with environment variable support."""
+"""Security configuration including JWT, CORS, and rate limiting."""
 
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
-class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+class SecuritySettings(BaseSettings):
+    """Security configuration for authentication, authorization, and API protection.
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
+    Handles JWT configuration, CORS policies, rate limiting, and API keys.
+    Provides methods for JWT key management and validation.
+    """
 
-    # Private: Cache for ephemeral JWT keys in development (not from env vars)
-    _ephemeral_private_key: str | None = None
-    _ephemeral_public_key: str | None = None
-
-    # Application
-    app_name: str = Field(default="python-fast-forge", alias="APP_NAME")
-    app_version: str = Field(default="0.1.0", alias="APP_VERSION")
-    app_env: str = Field(default="development", alias="APP_ENV")
-    debug: bool = Field(default=False, alias="DEBUG")
-    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-
-    # Server
-    host: str = Field(default="0.0.0.0", alias="HOST")
-    port: int = Field(default=8000, alias="PORT")
-    workers: int = Field(default=1, alias="WORKERS")
-    reload: bool = Field(default=False, alias="RELOAD")
-
-    # Database
-    database_url: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/fastapi_db",
-        alias="DATABASE_URL",
-    )
-    database_echo: bool = Field(default=False, alias="DATABASE_ECHO")
-    database_pool_size: int = Field(default=5, alias="DATABASE_POOL_SIZE")
-    database_max_overflow: int = Field(default=10, alias="DATABASE_MAX_OVERFLOW")
-
-    # CORS
-    cors_origins: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"], alias="CORS_ORIGINS"
-    )
-    cors_allow_credentials: bool = Field(default=True, alias="CORS_ALLOW_CREDENTIALS")
-    cors_allow_methods: list[str] = Field(
-        default=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        alias="CORS_ALLOW_METHODS",
-    )
-    cors_allow_headers: list[str] = Field(
-        default=[
-            "Content-Type",
-            "Authorization",
-            "X-Trace-ID",  # W3C Trace Context standard
-            "traceparent",  # W3C Trace Context (OpenTelemetry)
-            "tracestate",  # W3C Trace Context state
-            "CF-Ray",  # Cloudflare trace (cf-request-id discontinued in 2021)
-            "X-API-Client-ID",  # API signature authentication
-            "X-API-Timestamp",  # API signature authentication
-            "X-API-Signature",  # API signature authentication
-            "X-Tenant-Token",  # Multi-tenant JWT token
-        ],
-        alias="CORS_ALLOW_HEADERS",
-    )
-    cors_expose_headers: list[str] = Field(
-        default=[
-            "X-Trace-ID",  # Allow clients to read trace ID
-        ],
-        alias="CORS_EXPOSE_HEADERS",
-    )
-
-    # Rate Limiting
-    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
-    rate_limit_per_minute: int = Field(default=60, alias="RATE_LIMIT_PER_MINUTE")
-
-    # Security - JWT with ES256 (Elliptic Curve)
+    # JWT configuration with ES256 (Elliptic Curve)
     jwt_algorithm: str = Field(
         default="ES256",
         alias="JWT_ALGORITHM",
@@ -120,43 +55,66 @@ class Settings(BaseSettings):
         description="Secret key for API signature authentication (X-API-Signature header validation)",
     )
 
-    # API
-    api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
-    docs_url: str = Field(default="/docs", alias="DOCS_URL")
-    redoc_url: str = Field(default="/redoc", alias="REDOC_URL")
-    openapi_url: str = Field(default="/openapi.json", alias="OPENAPI_URL")
-
-    # OpenTelemetry
-    otel_enabled: bool = Field(default=False, alias="OTEL_ENABLED")
-    otel_service_name: str = Field(default="fastapi-boilerplate", alias="OTEL_SERVICE_NAME")
-    otel_exporter_otlp_endpoint: str = Field(
-        default="http://localhost:4317", alias="OTEL_EXPORTER_OTLP_ENDPOINT"
+    # CORS configuration
+    cors_origins: list[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000"],
+        alias="CORS_ORIGINS",
+        description="Allowed CORS origins",
     )
-    otel_exporter_otlp_insecure: bool = Field(default=True, alias="OTEL_EXPORTER_OTLP_INSECURE")
-    otel_trace_sample_rate: float = Field(default=1.0, alias="OTEL_TRACE_SAMPLE_RATE")
+    cors_allow_credentials: bool = Field(
+        default=True,
+        alias="CORS_ALLOW_CREDENTIALS",
+        description="Allow credentials in CORS requests",
+    )
+    cors_allow_methods: list[str] = Field(
+        default=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        alias="CORS_ALLOW_METHODS",
+        description="Allowed HTTP methods for CORS",
+    )
+    cors_allow_headers: list[str] = Field(
+        default=[
+            "Content-Type",
+            "Authorization",
+            "X-Trace-ID",  # W3C Trace Context standard
+            "traceparent",  # W3C Trace Context (OpenTelemetry)
+            "tracestate",  # W3C Trace Context state
+            "CF-Ray",  # Cloudflare trace
+            "X-API-Client-ID",  # API signature authentication
+            "X-API-Timestamp",  # API signature authentication
+            "X-API-Signature",  # API signature authentication
+            "X-Tenant-Token",  # Multi-tenant JWT token
+        ],
+        alias="CORS_ALLOW_HEADERS",
+        description="Allowed request headers for CORS",
+    )
+    cors_expose_headers: list[str] = Field(
+        default=["X-Trace-ID"],
+        alias="CORS_EXPOSE_HEADERS",
+        description="Headers exposed to the browser",
+    )
 
-    # Redis/Cache
-    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
-    redis_max_connections: int = Field(default=10, alias="REDIS_MAX_CONNECTIONS")
-    cache_enabled: bool = Field(default=True, alias="CACHE_ENABLED")
-    cache_ttl: int = Field(default=300, alias="CACHE_TTL")  # 5 minutes default
+    # Rate limiting
+    rate_limit_enabled: bool = Field(
+        default=True,
+        alias="RATE_LIMIT_ENABLED",
+        description="Enable rate limiting for API endpoints",
+    )
+    rate_limit_per_minute: int = Field(
+        default=60,
+        alias="RATE_LIMIT_PER_MINUTE",
+        description="Maximum requests per minute per client",
+    )
 
-    # Temporal Workflow Engine
-    temporal_host: str = Field(default="localhost:7233", alias="TEMPORAL_HOST")
-    temporal_namespace: str = Field(default="default", alias="TEMPORAL_NAMESPACE")
-    temporal_task_queue: str = Field(default="fastapi-tasks", alias="TEMPORAL_TASK_QUEUE")
-
-    # External Services
-    email_api_key: str = Field(
-        default="dev-email-api-key-UNSAFE",
-        alias="EMAIL_API_KEY",
-        description="Email API key - MUST be set in production",
+    # Environment flag (needed for validation)
+    is_production: bool = Field(
+        default=False,
+        description="Production environment flag (set internally)",
     )
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Parse CORS origins from string or list."""
+        """Parse CORS origins from comma-separated string or list."""
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",")]
         return cast("list[str]", v)
@@ -165,9 +123,8 @@ class Settings(BaseSettings):
     @classmethod
     def validate_cors_origins_https(cls, v: list[str], info: Any) -> list[str]:
         """Validate CORS origins use HTTPS in production."""
-        # Get app_env from validation info
-        app_env = info.data.get("app_env", "development")
-        if app_env.lower() == "production":
+        is_production = info.data.get("is_production", False)
+        if is_production:
             for origin in v:
                 if not origin.startswith("https://") and not origin.startswith("http://localhost"):
                     raise ValueError(
@@ -193,6 +150,47 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"JWT_ALGORITHM must be one of {allowed}. ES256 is recommended for production."
             )
+        return v
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str | None, _info: Any) -> str | None:
+        """Validate SECRET_KEY is secure in production.
+
+        Checks:
+        - Minimum length of 32 characters
+        - No insecure default values
+        - Required in production (if using HS256 algorithm)
+        """
+        if v is None:
+            return v
+
+        # Check for insecure default values
+        insecure_patterns = [
+            "<REQUIRED_SET_IN_PRODUCTION>",
+            "dev-secret-key",
+            "changeme",
+            "secret",
+            "password",
+            "unsafe",
+        ]
+        for pattern in insecure_patterns:
+            if pattern.lower() in v.lower():
+                raise ValueError(
+                    f"SECRET_KEY contains insecure default value '{pattern}'. "
+                    "Generate a secure random key for production:\n"
+                    '  python -c "import secrets; print(secrets.token_urlsafe(32))"'
+                )
+
+        # Check minimum length (32 characters recommended)
+        if len(v) < 32:
+            raise ValueError(
+                f"SECRET_KEY is too short ({len(v)} characters). "
+                "Minimum 32 characters required for security. "
+                "Generate a secure key:\n"
+                '  python -c "import secrets; print(secrets.token_urlsafe(32))"'
+            )
+
         return v
 
     def get_jwt_private_key(self) -> str:
@@ -230,21 +228,38 @@ class Settings(BaseSettings):
                     raise ValueError(f"JWT private key file not found: {self.jwt_private_key_path}")
                 return private_key_path.read_text()
 
-            # Priority 3: Development - generate ephemeral key (cached)
+            # Priority 3: Development - generate and persist ephemeral key
             if not self.is_production:
-                # Cache key to ensure same key across multiple calls
-                if self._ephemeral_private_key is None:
-                    from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
+                # Check for existing ephemeral key file
+                ephemeral_key_path = Path(".dev_jwt_private_key.pem")
 
-                    private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-                    pem = private_key.private_bytes(
-                        encoding=serialization.Encoding.PEM,
-                        format=serialization.PrivateFormat.PKCS8,
-                        encryption_algorithm=serialization.NoEncryption(),
-                    )
-                    self._ephemeral_private_key = pem.decode("utf-8")
+                if ephemeral_key_path.exists():
+                    # Load existing ephemeral key
+                    return ephemeral_key_path.read_text()
 
-                return self._ephemeral_private_key
+                # Generate new ephemeral key and persist it
+                from cryptography.hazmat.backends import default_backend  # noqa: PLC0415
+
+                private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+                pem = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+                pem_str = pem.decode("utf-8")
+
+                # Save to file for persistence across restarts
+                ephemeral_key_path.write_text(pem_str)
+                # Add to .gitignore to prevent accidental commit
+                gitignore_path = Path(".gitignore")
+                if gitignore_path.exists():
+                    gitignore_content = gitignore_path.read_text()
+                    if ".dev_jwt_private_key.pem" not in gitignore_content:
+                        with gitignore_path.open("a") as f:
+                            f.write("\n# Development JWT keys (auto-generated)\n")
+                            f.write(".dev_jwt_private_key.pem\n")
+
+                return pem_str
 
             raise ValueError(
                 "JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_PATH must be set in production for ES256 algorithm"
@@ -318,32 +333,3 @@ class Settings(BaseSettings):
 
         # HS256 (symmetric key) - same as private key
         return self.get_jwt_private_key()
-
-    @field_validator("email_api_key")
-    @classmethod
-    def validate_email_api_key(cls, v: str, info: Any) -> str:
-        """Validate email API key in production."""
-        app_env = info.data.get("app_env", "development")
-        if app_env.lower() == "production":
-            if "dev-email" in v.lower() or "unsafe" in v.lower():
-                raise ValueError(
-                    "EMAIL_API_KEY must be set to a real API key in production. "
-                    "Default development key is not allowed."
-                )
-        return v
-
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production environment."""
-        return self.app_env.lower() == "production"
-
-    @property
-    def is_development(self) -> bool:
-        """Check if running in development environment."""
-        return self.app_env.lower() == "development"
-
-
-@lru_cache
-def get_settings() -> Settings:
-    """Get cached settings instance."""
-    return Settings()

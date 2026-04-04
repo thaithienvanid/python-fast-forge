@@ -13,7 +13,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
-from authlib.jose import JsonWebToken
+from authlib.jose import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
@@ -221,10 +221,8 @@ class TestGetTenantIdWithInvalidToken:
         }
         # Create token with wrong EC private key
         wrong_key = _generate_wrong_ec_private_key()
-        jwt_instance = JsonWebToken([settings.jwt_algorithm])
-        header = {"alg": settings.jwt_algorithm}
-        token_bytes = jwt_instance.encode(header, payload, wrong_key)
-        token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, wrong_key)
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -268,10 +266,8 @@ class TestGetTenantIdWithInvalidToken:
             "iat": datetime.now(UTC),
         }
         private_key = settings.get_jwt_private_key()
-        jwt_instance = JsonWebToken([settings.jwt_algorithm])
-        header = {"alg": settings.jwt_algorithm}
-        token_bytes = jwt_instance.encode(header, payload, private_key)
-        token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, private_key)
 
         # Act & Assert - Pass same settings instance
         with pytest.raises(HTTPException) as exc_info:
@@ -297,10 +293,8 @@ class TestGetTenantIdWithInvalidToken:
             "iat": datetime.now(UTC),
         }
         private_key = settings.get_jwt_private_key()
-        jwt_instance = JsonWebToken([settings.jwt_algorithm])
-        header = {"alg": settings.jwt_algorithm}
-        token_bytes = jwt_instance.encode(header, payload, private_key)
-        token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, private_key)
 
         # Act & Assert - Pass same settings instance
         with pytest.raises(HTTPException) as exc_info:
@@ -453,10 +447,8 @@ class TestGetTenantIdEdgeCases:
             "extra_data": "x" * 10000,  # Large extra claim
         }
         private_key = settings.get_jwt_private_key()
-        jwt_instance = JsonWebToken([settings.jwt_algorithm])
-        header = {"alg": settings.jwt_algorithm}
-        token_bytes = jwt_instance.encode(header, payload, private_key)
-        token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, private_key)
 
         # Act - Pass same settings instance
         result = await get_tenant_id(x_tenant_token=token, settings=settings)
@@ -559,10 +551,8 @@ class TestGetTenantIdHTTPExceptionDetails:
         }
         # Create token with wrong EC private key
         wrong_key = _generate_wrong_ec_private_key()
-        jwt_instance = JsonWebToken([settings.jwt_algorithm])
-        header = {"alg": settings.jwt_algorithm}
-        token_bytes = jwt_instance.encode(header, payload, wrong_key)
-        token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+        token = jwt.encode(header, payload, wrong_key)
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

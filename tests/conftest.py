@@ -30,6 +30,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Import event handlers to ensure they're registered with the event bus
+import src.app.events.handlers  # noqa: F401 - Imported to register event handlers
 from src.infrastructure.config import Settings
 from src.presentation.api import create_app
 
@@ -110,12 +112,13 @@ def mock_temporal_client():
         yield mock_client
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def db_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine]:
-    """Create database engine (session-scoped for performance).
+    """Create database engine (function-scoped for test isolation).
 
-    The engine is expensive to create and can be safely shared.
-    Individual tests get their own sessions from this engine.
+    Each test gets a fresh engine to avoid async event loop conflicts.
+    While this is slower than session-scoped, it ensures proper test isolation
+    and compatibility with pytest-asyncio.
 
     Args:
         test_settings: Test configuration
@@ -350,7 +353,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     - Speed: Rollback is faster than truncating tables
 
     Args:
-        db_engine: Database engine (session-scoped)
+        db_engine: Database engine (function-scoped)
 
     Yields:
         AsyncSession: Database session within transaction
@@ -372,6 +375,12 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             reason="PostgreSQL not available"
         )
     """
+    # Create tables before starting transaction
+    from src.domain.models.base import Base
+
+    async with db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     # Create connection
     async with db_engine.connect() as connection, connection.begin() as transaction:
         # Create session bound to this transaction
@@ -387,6 +396,10 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
 
             # Rollback transaction (automatic cleanup)
             await transaction.rollback()
+
+    # Drop tables after test
+    async with db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 # ============================================================================

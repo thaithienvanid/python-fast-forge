@@ -12,10 +12,10 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from authlib.jose import JoseError
 
 from src.infrastructure.config import Settings
 from src.utils.tenant_auth import (
+    JWTError,
     create_tenant_token,
     decode_tenant_token,
     get_token_expiration,
@@ -183,14 +183,14 @@ class TestDecodeTenantToken:
 
         Arrange: Expired JWT token
         Act: Decode token
-        Assert: Raises JoseError
+        Assert: Raises JWTError
         """
         # Arrange
         tenant_id = uuid4()
         token = create_tenant_token(tenant_id, expires_delta=timedelta(seconds=-1))
 
         # Act & Assert
-        with pytest.raises(JoseError):
+        with pytest.raises(JWTError):
             decode_tenant_token(token)
 
     def test_raises_error_for_invalid_signature(self) -> None:
@@ -198,14 +198,14 @@ class TestDecodeTenantToken:
 
         Arrange: Token with wrong signature
         Act: Decode token
-        Assert: Raises JoseError
+        Assert: Raises JWTError
         """
         # Arrange
         # Create a token with a different settings instance (different key)
         token = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRfaWQiOiIwMThjNWU5ZS0xMjM0LTcwMDAtODAwMC0wMDAwMDAwMDAwMDAiLCJleHAiOjk5OTk5OTk5OTksImlhdCI6MTYwMDAwMDAwMCwidHlwZSI6InRlbmFudF9hY2Nlc3MifQ.invalid_signature"
 
         # Act & Assert
-        with pytest.raises(JoseError):
+        with pytest.raises(JWTError):
             decode_tenant_token(token)
 
     def test_raises_error_for_malformed_token(self) -> None:
@@ -213,13 +213,13 @@ class TestDecodeTenantToken:
 
         Arrange: Malformed token string
         Act: Decode token
-        Assert: Raises JoseError
+        Assert: Raises JWTError
         """
         # Arrange
         token = "not.a.valid.token"
 
         # Act & Assert
-        with pytest.raises(JoseError):
+        with pytest.raises(JWTError):
             decode_tenant_token(token)
 
 
@@ -297,14 +297,14 @@ class TestRefreshTenantToken:
 
         Arrange: Expired JWT token
         Act: Refresh token
-        Assert: Raises JoseError
+        Assert: Raises jwt.ExpiredSignatureError
         """
         # Arrange
         tenant_id = uuid4()
         old_token = create_tenant_token(tenant_id, expires_delta=timedelta(seconds=-1))
 
         # Act & Assert
-        with pytest.raises(JoseError):
+        with pytest.raises(JWTError):
             refresh_tenant_token(old_token)
 
 
