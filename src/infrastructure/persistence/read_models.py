@@ -105,7 +105,6 @@ class UserReadModel(Base):
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
-        index=True,
         comment="Creation timestamp",
     )
     updated_at = Column(
