@@ -11,138 +11,150 @@ Benefits:
 - Catches schema drift early
 - Validates all endpoints systematically
 - Property-based testing for edge cases
+
+NOTE: These tests require the API server to be running on localhost:8000.
+      They will be automatically skipped if the server is not available.
 """
 
+import httpx
 import pytest
-import schemathesis
-from hypothesis import settings
 
+# Check if API server is running before loading tests
+_server_available = False
+try:
+    response = httpx.get("http://localhost:8000/health", timeout=2.0)
+    _server_available = response.status_code == 200
+except Exception:
+    _server_available = False
 
-# Load the OpenAPI schema from the running FastAPI application
-schema = schemathesis.from_uri("http://localhost:8000/openapi.json")
+# Skip entire module if server is not available
+pytestmark = pytest.mark.skipif(
+    not _server_available,
+    reason="API server not running on localhost:8000. Start with: uv run python main.py",
+)
 
+# Only import schemathesis and load schema if server is available
+if _server_available:
+    import schemathesis
+    from hypothesis import settings
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_test_app():
-    """Ensure test app is running before contract tests.
+    schema = schemathesis.from_uri("http://localhost:8000/openapi.json")
 
-    In a CI/CD environment, the app should be started before running tests.
-    For local testing, you can start the app with:
-        uvicorn src.presentation.api.main:app --reload
-    """
-    import httpx
+    @schema.parametrize()
+    @settings(max_examples=50, deadline=5000)
+    def test_api_contract(case):
+        """Test all API endpoints match OpenAPI specification.
 
-    try:
-        response = httpx.get("http://localhost:8000/health", timeout=2.0)
-        if response.status_code != 200:
-            pytest.skip("API server is not responding correctly")
-    except Exception:
-        pytest.skip("API server not running on localhost:8000")
+        This test is automatically generated from the OpenAPI schema and
+        validates:
+        - Request schemas (query params, headers, body)
+        - Response schemas (status codes, headers, body)
+        - Data types and constraints
+        - Required vs optional fields
 
+        Schemathesis will generate multiple test cases per endpoint to test:
+        - Valid inputs
+        - Edge cases
+        - Boundary values
+        - Invalid inputs (negative testing)
 
-@schema.parametrize()
-@settings(max_examples=50, deadline=5000)
-def test_api_contract(case):
-    """Test all API endpoints match OpenAPI specification.
+        Args:
+            case: Auto-generated test case from Schemathesis
 
-    This test is automatically generated from the OpenAPI schema and
-    validates:
-    - Request schemas (query params, headers, body)
-    - Response schemas (status codes, headers, body)
-    - Data types and constraints
-    - Required vs optional fields
+        Raises:
+            AssertionError: If API doesn't match OpenAPI specification
+        """
+        # Execute the API call and validate response against spec
+        case.call_and_validate()
 
-    Schemathesis will generate multiple test cases per endpoint to test:
-    - Valid inputs
-    - Edge cases
-    - Boundary values
-    - Invalid inputs (negative testing)
+    @schema.parametrize(endpoint="/api/v1/users")
+    @settings(max_examples=20)
+    def test_users_endpoint_contract(case):
+        """Focused contract tests for /users endpoint.
 
-    Args:
-        case: Auto-generated test case from Schemathesis
+        Additional validation for the critical users endpoint beyond
+        the general contract test.
 
-    Raises:
-        AssertionError: If API doesn't match OpenAPI specification
-    """
-    # Execute the API call and validate response against spec
-    case.call_and_validate()
+        Validates:
+        - List users (GET /api/v1/users)
+        - Create user (POST /api/v1/users)
+        - Get user (GET /api/v1/users/{id})
+        - Update user (PATCH /api/v1/users/{id})
+        - Delete user (DELETE /api/v1/users/{id})
+        """
+        response = case.call()
 
+        # Validate response against OpenAPI spec
+        case.validate_response(response)
 
-@schema.parametrize(endpoint="/api/v1/users")
-@settings(max_examples=20)
-def test_users_endpoint_contract(case):
-    """Focused contract tests for /users endpoint.
+        # Additional custom validations for users endpoint
+        if (
+            case.method == "GET"
+            and response.status_code == 200
+            and "?" not in str(case.path_parameters)
+        ):
+            # Ensure pagination fields exist for list endpoints
+            data = response.json()
+            assert "items" in data or isinstance(data, list), "List endpoint should return items"
 
-    Additional validation for the critical users endpoint beyond
-    the general contract test.
+    @schema.parametrize(method="POST")
+    @settings(max_examples=30)
+    def test_create_endpoints_validation(case):
+        """Test POST endpoints with focused validation.
 
-    Validates:
-    - List users (GET /api/v1/users)
-    - Create user (POST /api/v1/users)
-    - Get user (GET /api/v1/users/{id})
-    - Update user (PATCH /api/v1/users/{id})
-    - Delete user (DELETE /api/v1/users/{id})
-    """
-    response = case.call()
+        Validates all create (POST) endpoints:
+        - Required fields enforced
+        - Optional fields handled correctly
+        - Validation errors return 422
+        - Duplicate resources return 400/409
 
-    # Validate response against OpenAPI spec
-    case.validate_response(response)
+        Args:
+            case: Auto-generated test case for POST endpoints
+        """
+        response = case.call()
 
-    # Additional custom validations for users endpoint
-    if (
-        case.method == "GET"
-        and response.status_code == 200
-        and "?" not in str(case.path_parameters)
-    ):
-        # Ensure pagination fields exist for list endpoints
+        # All POST endpoints should either succeed (201) or fail with validation error (422)
+        # or conflict (409)
+        assert response.status_code in [200, 201, 400, 409, 422, 401, 403], (
+            f"POST {case.path} returned unexpected status {response.status_code}"
+        )
+
+        # Validate against schema
+        case.validate_response(response)
+
+    @schema.parametrize(endpoint="/health")
+    def test_health_endpoint_contract(case):
+        """Test health check endpoint contract.
+
+        The health endpoint should always return 200 with a specific structure.
+        """
+        response = case.call()
+
+        # Health endpoint must always return 200
+        assert response.status_code == 200, "Health endpoint must return 200"
+
+        # Validate structure
         data = response.json()
-        assert "items" in data or isinstance(data, list), "List endpoint should return items"
+        assert "status" in data, "Health response must have 'status' field"
+        assert data["status"] == "healthy", "Health status should be 'healthy'"
 
+        # Validate against spec
+        case.validate_response(response)
 
-@schema.parametrize(method="POST")
-@settings(max_examples=30)
-def test_create_endpoints_validation(case):
-    """Test POST endpoints with focused validation.
+    # Configuration for Schemathesis hooks
+    def before_generate_case(context, strategy):
+        """Hook to customize test case generation.
 
-    Validates all create (POST) endpoints:
-    - Required fields enforced
-    - Optional fields handled correctly
-    - Validation errors return 422
-    - Duplicate resources return 400/409
+        Can be used to:
+        - Add authentication headers
+        - Modify request payloads
+        - Filter out certain test cases
+        - Add custom validation logic
+        """
+        return strategy
 
-    Args:
-        case: Auto-generated test case for POST endpoints
-    """
-    response = case.call()
-
-    # All POST endpoints should either succeed (201) or fail with validation error (422)
-    # or conflict (409)
-    assert response.status_code in [200, 201, 400, 409, 422, 401, 403], (
-        f"POST {case.path} returned unexpected status {response.status_code}"
-    )
-
-    # Validate against schema
-    case.validate_response(response)
-
-
-@schema.parametrize(endpoint="/health")
-def test_health_endpoint_contract(case):
-    """Test health check endpoint contract.
-
-    The health endpoint should always return 200 with a specific structure.
-    """
-    response = case.call()
-
-    # Health endpoint must always return 200
-    assert response.status_code == 200, "Health endpoint must return 200"
-
-    # Validate structure
-    data = response.json()
-    assert "status" in data, "Health response must have 'status' field"
-    assert data["status"] == "healthy", "Health status should be 'healthy'"
-
-    # Validate against spec
-    case.validate_response(response)
+    # Register hooks
+    schemathesis.hooks.register("before_generate_case", before_generate_case)
 
 
 @pytest.mark.parametrize(
@@ -163,8 +175,6 @@ def test_specific_endpoint_success_cases(endpoint, method):
         endpoint: API endpoint path
         method: HTTP method
     """
-    import httpx
-
     with httpx.Client(base_url="http://localhost:8000") as client:
         if method == "GET":
             response = client.get(endpoint)
@@ -191,20 +201,3 @@ def test_specific_endpoint_success_cases(endpoint, method):
             409,
             422,
         ], f"{method} {endpoint} returned {response.status_code}"
-
-
-# Configuration for Schemathesis hooks
-def before_generate_case(context, strategy):
-    """Hook to customize test case generation.
-
-    Can be used to:
-    - Add authentication headers
-    - Modify request payloads
-    - Filter out certain test cases
-    - Add custom validation logic
-    """
-    return strategy
-
-
-# Register hooks
-schemathesis.hooks.register("before_generate_case", before_generate_case)
