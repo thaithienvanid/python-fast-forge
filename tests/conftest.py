@@ -379,7 +379,8 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     from src.domain.models.base import Base
 
     async with db_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # Use checkfirst=True to avoid errors when tables/indexes already exist
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True))
 
     # Create connection
     async with db_engine.connect() as connection, connection.begin() as transaction:
@@ -399,7 +400,8 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
 
     # Drop tables after test
     async with db_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        # Use checkfirst=True to avoid errors when tables/indexes don't exist
+        await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, checkfirst=True))
 
 
 # ============================================================================
