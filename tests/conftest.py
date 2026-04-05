@@ -14,6 +14,7 @@ Fixture Scoping Strategy:
 """
 
 import asyncio
+import threading
 from collections.abc import AsyncGenerator, Generator
 from datetime import UTC, datetime
 from typing import Any
@@ -40,7 +41,9 @@ from tests.factories import user_factory  # noqa: F401 - Imported for test use
 
 
 # Global lock to prevent concurrent database schema creation
-_db_schema_lock = asyncio.Lock()
+# Using threading.Lock instead of asyncio.Lock because it works across
+# different event loops (pytest-asyncio creates new loops for different tests)
+_db_schema_lock = threading.Lock()
 _db_schema_created = False
 
 
@@ -384,7 +387,8 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     from src.domain.models.base import Base
 
     # Ensure schema is created only once across all tests (thread-safe)
-    async with _db_schema_lock:
+    # Using threading.Lock (not asyncio.Lock) to work across event loops
+    with _db_schema_lock:
         if not _db_schema_created:
             async with db_engine.begin() as conn:
                 await conn.run_sync(Base.metadata.drop_all)
