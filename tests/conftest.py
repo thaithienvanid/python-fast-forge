@@ -30,10 +30,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# Global lock to prevent concurrent database schema creation
-_db_schema_lock = asyncio.Lock()
-_db_schema_created = False
-
 # Import event handlers to ensure they're registered with the event bus
 import src.app.events.handlers  # noqa: F401 - Imported to register event handlers
 from src.infrastructure.config import Settings
@@ -41,6 +37,11 @@ from src.presentation.api import create_app
 
 # Import test factories for use in tests
 from tests.factories import user_factory  # noqa: F401 - Imported for test use
+
+
+# Global lock to prevent concurrent database schema creation
+_db_schema_lock = asyncio.Lock()
+_db_schema_created = False
 
 
 # ============================================================================
