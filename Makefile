@@ -178,6 +178,93 @@ audit:  ## Audit dependencies for vulnerabilities
 	@$(UV) run safety check
 
 # ===================================
+# Enterprise Compliance (SBOM, Licenses)
+# ===================================
+sbom:  ## Generate CycloneDX SBOM (Software Bill of Materials)
+	@echo "→ Generating CycloneDX SBOM..."
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5
+	@$(UV) run cyclonedx-py environment -o sbom.xml --of XML --sv 1.5
+	@echo "✓ SBOM generated: sbom.json, sbom.xml"
+
+sbom-json:  ## Generate SBOM in JSON format only
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5
+	@echo "✓ SBOM generated: sbom.json"
+
+sbom-xml:  ## Generate SBOM in XML format only
+	@$(UV) run cyclonedx-py environment -o sbom.xml --of XML --sv 1.5
+	@echo "✓ SBOM generated: sbom.xml"
+
+licenses:  ## Generate license report (markdown)
+	@echo "→ Generating license report..."
+	@$(UV) run pip-licenses --format=markdown --output-file=licenses.md
+	@echo "✓ License report generated: licenses.md"
+
+licenses-json:  ## Generate license report in JSON format
+	@$(UV) run pip-licenses --format=json --output-file=licenses.json
+	@echo "✓ License report (JSON) generated: licenses.json"
+
+license-check:  ## Check license compatibility
+	@echo "→ Checking license compatibility..."
+	@$(UV) run licensecheck --format text
+
+trivy-scan:  ## Run Trivy security scanner on filesystem
+	@echo "→ Running Trivy filesystem scan..."
+	@trivy fs --severity HIGH,CRITICAL --format table .
+
+trivy-scan-full:  ## Run complete Trivy scan (all severities)
+	@echo "→ Running complete Trivy scan..."
+	@trivy fs --format table .
+
+trivy-scan-json:  ## Run Trivy scan and export to JSON
+	@echo "→ Running Trivy scan (JSON output)..."
+	@trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+	@echo "✓ Trivy report generated: trivy-report.json"
+
+dependency-tree:  ## Show dependency tree
+	@$(UV) run pipdeptree
+
+dependency-tree-json:  ## Export dependency tree to JSON
+	@$(UV) run pipdeptree --json-tree > dependencies.json
+	@echo "✓ Dependency tree exported: dependencies.json"
+
+compliance-package:  ## Generate complete compliance bundle (SBOM + licenses + dependencies)
+	@echo "→ Generating enterprise compliance package..."
+	@mkdir -p compliance-reports
+	@$(UV) run cyclonedx-py environment -o compliance-reports/sbom.json --of JSON --sv 1.5
+	@$(UV) run cyclonedx-py environment -o compliance-reports/sbom.xml --of XML --sv 1.5
+	@$(UV) run pip-licenses --format=markdown --output-file=compliance-reports/licenses.md
+	@$(UV) run pip-licenses --format=json --output-file=compliance-reports/licenses.json
+	@$(UV) run pipdeptree --json-tree > compliance-reports/dependencies.json
+	@echo "✓ Compliance package generated in compliance-reports/"
+	@ls -lh compliance-reports/
+
+security-audit:  ## Complete security audit (all scans + compliance)
+	@echo "╔════════════════════════════════════════════════════════════╗"
+	@echo "║  Security & Compliance Audit                               ║"
+	@echo "╚════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "→ Step 1/5: Bandit security scan..."
+	@$(BANDIT) -c pyproject.toml -r $(SRC_DIR) -f screen
+	@echo ""
+	@echo "→ Step 2/5: pip-audit vulnerability scan..."
+	@$(UV) run pip-audit
+	@echo ""
+	@echo "→ Step 3/5: Safety check..."
+	@$(UV) run safety check
+	@echo ""
+	@echo "→ Step 4/5: License compatibility check..."
+	@$(UV) run licensecheck --format text
+	@echo ""
+	@echo "→ Step 5/5: Generating SBOM..."
+	@$(UV) run cyclonedx-py environment -o sbom.json --of JSON --sv 1.5 2>&1 | grep -v "WARNING" || true
+	@echo ""
+	@echo "✅ Security audit complete!"
+	@echo ""
+	@echo "Reports generated:"
+	@echo "  • sbom.json - Software Bill of Materials"
+	@echo "  • See docs/security/SECURITY.md for details"
+
+# ===================================
 # Pre-commit Hooks
 # ===================================
 pre-commit-install:  ## Install pre-commit hooks

@@ -6,24 +6,20 @@ entity-specific repositories.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.filtering import IFilterSet
 from src.domain.interfaces import IRepository
 from src.domain.models.base import BaseEntity
 from src.domain.pagination import Cursor, CursorPage, create_cursor_page
+from src.infrastructure.repositories.mixins import SoftDeleteQueryMixin
 
 
-if TYPE_CHECKING:
-    from src.infrastructure.filtering.filterset import FilterSet
-else:
-    FilterSet = Any
-
-
-class BaseRepository[T: BaseEntity](IRepository[T]):
+class BaseRepository[T: BaseEntity](IRepository[T], SoftDeleteQueryMixin):
     """Generic repository providing CRUD operations with soft delete support.
 
     Implements the repository pattern with reusable database operations for
@@ -57,11 +53,14 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
 
         Returns:
             Entity instance if found, None otherwise
+
+        Design Pattern:
+            Uses SoftDeleteQueryMixin for consistent soft delete filtering
         """
         query = select(self._model).where(self._model.id == id)
 
-        if not include_deleted:
-            query = query.where(self._model.deleted_at.is_(None))
+        # Use mixin's soft delete filter (replaces manual WHERE clause)
+        query = self.apply_soft_delete_filter(query, self._model, include_deleted)  # type: ignore[arg-type, assignment]
 
         result = await self._session.execute(query)
         return result.scalar_one_or_none()
@@ -83,11 +82,14 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
 
         Returns:
             List of entity instances matching criteria
+
+        Design Pattern:
+            Uses SoftDeleteQueryMixin for consistent soft delete filtering
         """
         query = select(self._model)
 
-        if not include_deleted:
-            query = query.where(self._model.deleted_at.is_(None))
+        # Use mixin's soft delete filter (replaces manual WHERE clause)
+        query = self.apply_soft_delete_filter(query, self._model, include_deleted)  # type: ignore[arg-type, assignment]
 
         if tenant_id and hasattr(self._model, "tenant_id"):
             model_cls: Any = self._model
@@ -256,9 +258,8 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
         """
         query = select(self._model)
 
-        # Filter out soft-deleted records by default
-        if not include_deleted:
-            query = query.where(self._model.deleted_at.is_(None))
+        # Use mixin's soft delete filter (replaces manual WHERE clause)
+        query = self.apply_soft_delete_filter(query, self._model, include_deleted)  # type: ignore[arg-type, assignment]
 
         # Add tenant filtering if tenant_id provided and model has tenant_id
         if tenant_id and hasattr(self._model, "tenant_id"):
@@ -322,7 +323,7 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
 
     async def find(
         self,
-        filterset: "FilterSet",
+        filterset: IFilterSet,
         skip: int = 0,
         limit: int = 100,
     ) -> list[T]:
@@ -367,7 +368,48 @@ class BaseRepository[T: BaseEntity](IRepository[T]):
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self, filterset: "FilterSet") -> int:
+    async def count_all(
+        self,
+        tenant_id: UUID | None = None,
+        include_deleted: bool = False,
+    ) -> int:
+        """Count total entities with optional filtering.
+
+        Simpler count method for basic pagination use cases. For complex filtering,
+        use the count(filterset) method instead.
+
+        Args:
+            tenant_id: Optional tenant ID for multi-tenant isolation
+            include_deleted: Whether to include soft-deleted entities
+
+        Returns:
+            Total number of entities matching criteria
+
+        Example:
+            ```python
+            total = await repo.count_all(tenant_id=tenant_id)
+            total_pages = ceil(total / page_size)
+            ```
+
+        Design Pattern:
+            Uses SoftDeleteQueryMixin for consistent soft delete filtering
+        """
+        # Build count query
+        count_query = select(func.count()).select_from(self._model)
+
+        # Use mixin's soft delete filter
+        count_query = self.apply_soft_delete_filter(count_query, self._model, include_deleted)  # type: ignore[arg-type, assignment, type-var]
+
+        # Add tenant filtering if tenant_id provided
+        if tenant_id and hasattr(self._model, "tenant_id"):
+            model_cls: Any = self._model
+            count_query = count_query.where(model_cls.tenant_id == tenant_id)
+
+        # Execute
+        result = await self._session.execute(count_query)
+        return result.scalar_one()
+
+    async def count(self, filterset: IFilterSet) -> int:
         """Count entities matching FilterSet criteria (generic counting support).
 
         Useful for implementing pagination UI that shows total count. Works with

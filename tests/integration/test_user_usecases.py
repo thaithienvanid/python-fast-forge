@@ -117,19 +117,22 @@ class TestListUsersUseCase:
 
         Arrange: Mock repository with user list, create use case
         Act: Execute use case without parameters
-        Assert: Returns expected user list, repository called once
+        Assert: Returns expected user list and count, repository called once
         """
         # Arrange
         users = [sample_user]
         mock_repository.get_all.return_value = users
+        mock_repository.count_all.return_value = len(users)
         use_case = ListUsersUseCase(mock_repository)
 
         # Act
-        result = await use_case.execute()
+        result_users, result_total = await use_case.execute()
 
         # Assert
-        assert result == users
+        assert result_users == users
+        assert result_total == len(users)
         mock_repository.get_all.assert_called_once()
+        mock_repository.count_all.assert_called_once()
 
     async def test_execute_respects_pagination(self, mock_repository):
         """Test that execute passes pagination parameters to repository.
@@ -432,6 +435,8 @@ class TestBatchCreateUsersUseCase:
         uow.users = AsyncMock()
         uow.users.get_by_email = AsyncMock(return_value=None)
         uow.users.get_by_username = AsyncMock(return_value=None)
+        uow.users.find_by_emails = AsyncMock(return_value=[])
+        uow.users.find_by_usernames = AsyncMock(return_value=[])
         uow.users.create = AsyncMock()
         uow.__aenter__ = AsyncMock(return_value=uow)
         uow.__aexit__ = AsyncMock(return_value=None)
@@ -537,11 +542,11 @@ class TestBatchCreateUsersUseCase:
             username="existing",
             is_active=True,
         )
-        mock_uow.users.get_by_email.return_value = existing_user
+        mock_uow.users.find_by_emails.return_value = [existing_user]
         use_case = BatchCreateUsersUseCase(mock_uow_factory)
 
         # Act & Assert
-        with pytest.raises(ValidationError, match="User with email .* already exists"):
+        with pytest.raises(ValidationError, match="Users with emails .* already exist"):
             await use_case.execute(sample_users_data)
 
     async def test_execute_checks_for_existing_username_in_database(
@@ -555,17 +560,11 @@ class TestBatchCreateUsersUseCase:
             username="user1",
             is_active=True,
         )
-
-        async def get_by_username_side_effect(username):
-            if username == "user1":
-                return existing_user
-            return None
-
-        mock_uow.users.get_by_username.side_effect = get_by_username_side_effect
+        mock_uow.users.find_by_usernames.return_value = [existing_user]
         use_case = BatchCreateUsersUseCase(mock_uow_factory)
 
         # Act & Assert
-        with pytest.raises(ValidationError, match="User with username .* already exists"):
+        with pytest.raises(ValidationError, match="Users with usernames .* already exist"):
             await use_case.execute(sample_users_data)
 
     async def test_execute_raises_value_error_on_empty_list(self, mock_uow_factory):
@@ -624,7 +623,7 @@ class TestBatchCreateUsersUseCase:
         use_case = BatchCreateUsersUseCase(mock_uow_factory)
 
         # Act & Assert
-        with pytest.raises(ValidationError, match="One or more emails already exist"):
+        with pytest.raises(ValidationError, match="User with email .* already exists"):
             await use_case.execute(sample_users_data)
 
     async def test_execute_handles_integrity_error_for_username(
@@ -638,7 +637,7 @@ class TestBatchCreateUsersUseCase:
         use_case = BatchCreateUsersUseCase(mock_uow_factory)
 
         # Act & Assert
-        with pytest.raises(ValidationError, match="One or more usernames already exist"):
+        with pytest.raises(ValidationError, match="User with username .* already exists"):
             await use_case.execute(sample_users_data)
 
     async def test_execute_uses_unit_of_work_context_manager(

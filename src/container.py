@@ -18,14 +18,15 @@ from src.app.usecases.user_usecases import (
 )
 from src.domain.interfaces import IUserRepository
 from src.domain.models.user import User
-from src.external.email_service import EmailService
 from src.infrastructure.cache.redis_cache import RedisCache
 from src.infrastructure.config import get_settings
 from src.infrastructure.patterns.circuit_breaker import CircuitBreakerService
 from src.infrastructure.persistence.database import Database
 from src.infrastructure.persistence.unit_of_work import UnitOfWork
+from src.infrastructure.plugins.manager import PluginManager
 from src.infrastructure.repositories.cached_user_repository import CachedUserRepository
 from src.infrastructure.repositories.user_repository import UserRepository
+from src.infrastructure.services import get_email_service
 
 
 class UseCases(containers.DeclarativeContainer):
@@ -53,6 +54,7 @@ class Container(containers.DeclarativeContainer):
         modules=[
             "src.presentation.api.v1.endpoints.users",
             "src.presentation.api.v1.endpoints.health",
+            "src.presentation.api.v1.endpoints.plugins",  # Plugin management endpoints
         ]
     )
 
@@ -63,6 +65,13 @@ class Container(containers.DeclarativeContainer):
     database = providers.Singleton(Database, settings=config)
     cache = providers.Singleton(RedisCache, settings=config)
     circuit_breaker = providers.Singleton(CircuitBreakerService)
+
+    # Plugin System
+    plugin_manager = providers.Singleton(
+        PluginManager,
+        plugin_dirs=config.provided.plugins.plugin_dirs,
+        auto_activate=config.provided.plugins.plugin_auto_activate,
+    )
 
     # Provide database session as a context manager
     db_session = providers.Factory(
@@ -83,11 +92,9 @@ class Container(containers.DeclarativeContainer):
         cache=cache,
     )
 
-    # Selector for repository based on cache_enabled setting
-    # Caching can be toggled via CACHE_ENABLED environment variable
-    # - CACHE_ENABLED=true  → Uses CachedUserRepository (Redis caching)
-    # - CACHE_ENABLED=false → Uses UserRepository (direct DB, no cache)
-    # Note: For now, always use cached repository (it handles cache misses gracefully)
+    # Repository with optional caching based on cache_enabled setting
+    # Always use cached repository - it handles enabled/disabled internally
+    # The CachedUserRepository checks cache_enabled and bypasses cache if disabled
     user_repository = user_repository_cached
 
     # Session factory for Unit of Work
@@ -100,11 +107,8 @@ class Container(containers.DeclarativeContainer):
     )
 
     # External Services
-    email_service = providers.Singleton(
-        EmailService,
-        circuit_breaker=circuit_breaker,
-        api_key=config.provided.email_api_key,
-    )
+    # Email service (SMTP + SendGrid support)
+    email_service = providers.Singleton(get_email_service)
 
     # Use Cases (nested container)
     use_cases = providers.Container(

@@ -14,6 +14,7 @@ Fixture Scoping Strategy:
 """
 
 import asyncio
+import threading
 from collections.abc import AsyncGenerator, Generator
 from datetime import UTC, datetime
 from typing import Any
@@ -30,11 +31,20 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Import event handlers to ensure they're registered with the event bus
+import src.app.events.handlers  # noqa: F401 - Imported to register event handlers
 from src.infrastructure.config import Settings
 from src.presentation.api import create_app
 
 # Import test factories for use in tests
 from tests.factories import user_factory  # noqa: F401 - Imported for test use
+
+
+# Global lock to prevent concurrent database schema creation
+# Using threading.Lock instead of asyncio.Lock because it works across
+# different event loops (pytest-asyncio creates new loops for different tests)
+_db_schema_lock = threading.Lock()
+_db_schema_created = False
 
 
 # ============================================================================
@@ -110,12 +120,13 @@ def mock_temporal_client():
         yield mock_client
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def db_engine(test_settings: Settings) -> AsyncGenerator[AsyncEngine]:
-    """Create database engine (session-scoped for performance).
+    """Create database engine (function-scoped for test isolation).
 
-    The engine is expensive to create and can be safely shared.
-    Individual tests get their own sessions from this engine.
+    Each test gets a fresh engine to avoid async event loop conflicts.
+    While this is slower than session-scoped, it ensures proper test isolation
+    and compatibility with pytest-asyncio.
 
     Args:
         test_settings: Test configuration
@@ -350,7 +361,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     - Speed: Rollback is faster than truncating tables
 
     Args:
-        db_engine: Database engine (session-scoped)
+        db_engine: Database engine (function-scoped)
 
     Yields:
         AsyncSession: Database session within transaction
@@ -372,7 +383,19 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             reason="PostgreSQL not available"
         )
     """
-    # Create connection
+    global _db_schema_created
+    from src.domain.models.base import Base
+
+    # Ensure schema is created only once across all tests (thread-safe)
+    # Using threading.Lock (not asyncio.Lock) to work across event loops
+    with _db_schema_lock:
+        if not _db_schema_created:
+            async with db_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
+            _db_schema_created = True
+
+    # Create connection and start transaction
     async with db_engine.connect() as connection, connection.begin() as transaction:
         # Create session bound to this transaction
         session_factory = async_sessionmaker(

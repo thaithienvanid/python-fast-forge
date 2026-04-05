@@ -126,13 +126,17 @@ async def list_users(
         tenant_id: Optional tenant ID for filtering (from X-Tenant-ID header)
 
     Returns:
-        Paginated list of users
+        Paginated list of users with correct total count
+
+    Note:
+        The total field now correctly returns the total number of users in the database,
+        not just the number of users in the current page.
     """
-    users = await use_case.execute(skip=skip, limit=limit, tenant_id=tenant_id)
+    users, total = await use_case.execute(skip=skip, limit=limit, tenant_id=tenant_id)
 
     return UserListResponse(
         items=[UserResponse.model_validate(user) for user in users],
-        total=len(users),
+        total=total,  # ✅ Correct total count from database
         page=skip // limit + 1 if limit > 0 else 1,
         page_size=limit,
     )

@@ -1,4 +1,4 @@
-"""Common API dependencies for tenant isolation."""
+"""Common API dependencies for tenant isolation and compliance."""
 
 from typing import Annotated
 from uuid import UUID
@@ -8,12 +8,55 @@ from fastapi import Depends, Header, HTTPException, status
 from pydantic import ValidationError
 from structlog import get_logger
 
+from src.infrastructure.compliance import ComplianceManager
 from src.infrastructure.config import Settings, get_settings
 from src.presentation.schemas.error import ErrorDetail
 from src.utils.tenant_auth import decode_tenant_token
 
 
+# Alias for backward compatibility
+JWTError = JoseError
+
+
 logger = get_logger(__name__)
+
+# Global compliance manager instance
+_compliance_manager: ComplianceManager | None = None
+
+
+def get_compliance_manager() -> ComplianceManager:
+    """Get ComplianceManager instance (singleton pattern).
+
+    This provides a single instance of the ComplianceManager across
+    the application for consistent compliance tracking.
+
+    Returns:
+        ComplianceManager instance with all compliance frameworks
+
+    Example:
+        ```python
+        @router.post("/users")
+        async def create_user(
+            compliance: Annotated[ComplianceManager, Depends(get_compliance_manager)],
+        ):
+            # Log compliance event
+            await compliance.hipaa.log_audit_event(...)
+        ```
+    """
+    import base64  # noqa: PLC0415
+    import hashlib  # noqa: PLC0415
+
+    global _compliance_manager
+    if _compliance_manager is None:
+        settings = get_settings()
+        # Derive Fernet-compatible encryption key from JWT secret
+        encryption_key = None
+        if hasattr(settings.security, "jwt_secret_key"):
+            # Hash the JWT secret to get 32 bytes, then base64-encode for Fernet
+            key_bytes = hashlib.sha256(settings.security.jwt_secret_key.encode()).digest()
+            encryption_key = base64.urlsafe_b64encode(key_bytes)
+        _compliance_manager = ComplianceManager(encryption_key=encryption_key)
+    return _compliance_manager
 
 
 async def get_tenant_id(
@@ -75,7 +118,7 @@ async def get_tenant_id(
             )
             return tenant_id
 
-        except JoseError as e:
+        except JWTError as e:
             # Handle JWT-specific errors
             error_msg = str(e).lower()
 

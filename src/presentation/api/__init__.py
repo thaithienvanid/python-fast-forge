@@ -1,5 +1,6 @@
 """FastAPI application factory and configuration."""
 
+import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -8,6 +9,8 @@ from fastapi import FastAPI
 from src.container import Container
 from src.infrastructure.config import Settings, get_settings
 from src.infrastructure.logging.config import configure_logging, get_logger
+from src.infrastructure.projections.user_projection import UserProjectionWorker
+from src.infrastructure.repositories.event_store_repository import EventStoreRepository
 from src.infrastructure.telemetry import configure_opentelemetry, instrument_fastapi
 from src.presentation.api.middleware.cors import setup_cors
 from src.presentation.api.middleware.error_handling import setup_exception_handlers
@@ -35,9 +38,50 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     except Exception as e:
         logger.error("cache_initialization_failed", error=str(e))
 
+    # Initialize projection worker for CQRS
+    projection_worker = None
+    projection_task = None
+    try:
+        import asyncio  # noqa: PLC0415
+
+        # Get database from container
+        database = app.state.container.database()
+        session_factory = database.get_session_factory()
+
+        # Create session for projection worker
+        async with session_factory() as session:
+            # Create event store and projection worker
+            event_store = EventStoreRepository(session)
+            projection_worker = UserProjectionWorker(
+                event_store=event_store,
+                session=session,
+            )
+
+            # Start worker in background task
+            projection_task = asyncio.create_task(projection_worker.start(poll_interval=5.0))
+            app.state.projection_task = projection_task
+            app.state.projection_worker = projection_worker
+
+            logger.info("projection_worker_started", projection="user_projection")
+    except Exception as e:
+        logger.error("projection_worker_start_failed", error=str(e))
+
     yield
 
     # Shutdown
+    # Stop projection worker
+    if projection_worker:
+        try:
+            await projection_worker.stop()
+            if projection_task and not projection_task.done():
+                projection_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await projection_task
+            logger.info("projection_worker_stopped")
+        except Exception as e:
+            logger.error("projection_worker_stop_failed", error=str(e))
+
+    # Disconnect cache
     try:
         cache = app.state.container.cache()
         await cache.disconnect()
@@ -68,6 +112,7 @@ def create_app() -> FastAPI:
         modules=[
             "src.presentation.api.v1.endpoints.users",
             "src.presentation.api.v1.endpoints.health",
+            "src.presentation.api.v1.endpoints.plugins",
         ]
     )
 
@@ -79,6 +124,22 @@ def create_app() -> FastAPI:
 Health check and monitoring endpoints.
 
 Use these endpoints to verify the API and its dependencies are operational.
+            """,
+        },
+        {
+            "name": "plugins",
+            "description": """
+Plugin system management endpoints.
+
+### Features
+- **Plugin Discovery**: List all available plugins
+- **Lifecycle Management**: Activate, deactivate, and reload plugins
+- **Health Monitoring**: Check plugin health and status
+- **Hot Reload**: Update plugins without service restart
+
+### Plugin System
+The plugin system provides enterprise extensibility for auth, email, and storage providers.
+Plugins can be managed dynamically at runtime without downtime.
             """,
         },
         {

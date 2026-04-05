@@ -626,12 +626,20 @@ class TestPaginationPropertyBased:
         """Property: Encoding then decoding produces original cursor.
 
         This test runs 100+ times with different cursor data.
+        Note: Cursors that exceed MAX_CURSOR_LENGTH (1024 bytes) are filtered out.
         """
+        from hypothesis import assume
+
         # Arrange
         cursor = Cursor(value=cursor_data["value"], sort_value=cursor_data.get("sort_value"))
 
         # Act
         encoded = cursor.encode()
+
+        # Assume: Cursor size must be within limits (filter out oversized cursors)
+        # This can happen with multi-byte unicode characters
+        assume(len(encoded) <= 1024)  # MAX_CURSOR_LENGTH
+
         decoded = Cursor.decode(encoded)
 
         # Assert

@@ -44,6 +44,7 @@ DATABASE_MAX_OVERFLOW=10
 
 # Security
 SECRET_KEY=your-super-secret-key-min-32-characters
+JWT_SECRET_KEY=another-super-secret-key-min-32-characters
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
@@ -394,6 +395,7 @@ docker compose exec redis redis-cli ping
 # Set production secrets
 export DATABASE_URL="postgresql+asyncpg://..."
 export SECRET_KEY="..."
+export JWT_SECRET_KEY="..."
 ```
 
 ### Using Docker Secrets

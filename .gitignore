@@ -40,6 +40,19 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Security & compliance reports
+compliance-reports/
+sbom.json
+sbom.xml
+licenses.md
+licenses.json
+dependencies.json
+bandit-report.json
+safety-report.json
+pip-audit-report.json
+trivy-report.json
+trivy-results.sarif
+
 # Environments
 .env
 .venv
@@ -81,3 +94,6 @@ dmypy.json
 tmp/
 temp/
 *.tmp
+
+# Development JWT keys (auto-generated)
+.dev_jwt_private_key.pem

@@ -14,7 +14,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from authlib.jose import JoseError, JsonWebToken
+from authlib.jose import JoseError, jwt
 from structlog import get_logger
 
 from src.domain.tenant_claims import TenantTokenClaims
@@ -22,6 +22,9 @@ from src.infrastructure.config import Settings, get_settings
 
 
 logger = get_logger(__name__)
+
+# Create alias for backward compatibility
+JWTError = JoseError
 
 
 def create_tenant_token(
@@ -80,10 +83,16 @@ def create_tenant_token(
     # Get signing key
     private_key = settings.get_jwt_private_key()
 
-    # Encode token with configured algorithm
-    jwt_instance = JsonWebToken([settings.jwt_algorithm])
-    header = {"alg": settings.jwt_algorithm}
-    token_bytes = jwt_instance.encode(header, payload, private_key)
+    # Encode token with ES256 using authlib
+    # authlib.jose.jwt.encode requires header parameter
+    header = {"alg": settings.jwt_algorithm, "typ": "JWT"}
+    token_bytes = jwt.encode(
+        header,
+        payload,
+        private_key,
+    )
+
+    # authlib returns bytes, decode to string
     token = token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
 
     logger.debug(
@@ -110,7 +119,8 @@ def decode_tenant_token(
         Validated TenantTokenClaims object
 
     Raises:
-        JoseError: If token has expired or is invalid (signature, format, etc.)
+        jwt.ExpiredSignatureError: If token has expired
+        jwt.JWTError: If token is invalid (signature, format, etc.)
         ValueError: If claims are invalid
 
     Example:
@@ -119,7 +129,7 @@ def decode_tenant_token(
             claims = decode_tenant_token(token)
             tenant_id = claims.tenant_id
             print(f"Token valid for tenant: {tenant_id}")
-        except JoseError as e:
+        except jwt.JWTError as e:
             print(f"Invalid token: {e}")
         ```
     """
@@ -129,21 +139,15 @@ def decode_tenant_token(
     # Get verification key
     public_key = settings.get_jwt_public_key()
 
-    # Decode with validation using configured algorithm
-    jwt_instance = JsonWebToken([settings.jwt_algorithm])
-    claims_obj = jwt_instance.decode(token, public_key)
+    # Decode with validation using authlib
+    # authlib.jose.jwt.decode returns JWTClaims object
+    jwt_claims = jwt.decode(token, public_key)
 
-    # Validate expiration manually
-    if "exp" in claims_obj:
-        exp_timestamp = claims_obj["exp"]
-        if (
-            isinstance(exp_timestamp, (int, float))
-            and datetime.now(UTC).timestamp() >= exp_timestamp
-        ):
-            raise JoseError("Signature has expired")
+    # Validate the claims (checks exp, iat, etc.)
+    jwt_claims.validate()
 
-    # Authlib validates signature automatically
-    payload = claims_obj
+    # Convert JWTClaims to dict for processing
+    payload = dict(jwt_claims)
 
     # Convert to claims model
     claims = TenantTokenClaims.from_jwt_payload(payload)
@@ -176,7 +180,8 @@ def refresh_tenant_token(
         New JWT token string with same tenant_id but new expiration
 
     Raises:
-        JoseError: If old token has expired or is invalid
+        jwt.ExpiredSignatureError: If old token has expired
+        jwt.JWTError: If old token is invalid
 
     Example:
         ```python
@@ -221,7 +226,7 @@ def get_token_expiration(token: str, settings: Settings | None = None) -> dateti
         Expiration datetime in UTC
 
     Raises:
-        JoseError: If token is invalid
+        jwt.JWTError: If token is invalid
 
     Example:
         ```python
@@ -258,7 +263,7 @@ def is_token_expired(token: str, settings: Settings | None = None) -> bool:
     try:
         exp = get_token_expiration(token, settings)
         return datetime.now(UTC) >= exp
-    except JoseError:
+    except JWTError:
         # If token is invalid for any reason, consider it expired
         return True
 
@@ -279,7 +284,7 @@ def verify_tenant_token(
         Validated TenantTokenClaims object
 
     Raises:
-        JoseError: If token is invalid
+        jwt.JWTError: If token is invalid
         ValueError: If expected_tenant_id doesn't match
 
     Example:
