@@ -30,6 +30,10 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Global lock to prevent concurrent database schema creation
+_db_schema_lock = asyncio.Lock()
+_db_schema_created = False
+
 # Import event handlers to ensure they're registered with the event bus
 import src.app.events.handlers  # noqa: F401 - Imported to register event handlers
 from src.infrastructure.config import Settings
@@ -375,14 +379,18 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
             reason="PostgreSQL not available"
         )
     """
-    # Create tables before starting transaction
+    global _db_schema_created
     from src.domain.models.base import Base
 
-    async with db_engine.begin() as conn:
-        # Use checkfirst=True to avoid errors when tables/indexes already exist
-        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True))
+    # Ensure schema is created only once across all tests (thread-safe)
+    async with _db_schema_lock:
+        if not _db_schema_created:
+            async with db_engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
+            _db_schema_created = True
 
-    # Create connection
+    # Create connection and start transaction
     async with db_engine.connect() as connection, connection.begin() as transaction:
         # Create session bound to this transaction
         session_factory = async_sessionmaker(
@@ -397,11 +405,6 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
 
             # Rollback transaction (automatic cleanup)
             await transaction.rollback()
-
-    # Drop tables after test
-    async with db_engine.begin() as conn:
-        # Use checkfirst=True to avoid errors when tables/indexes don't exist
-        await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, checkfirst=True))
 
 
 # ============================================================================
