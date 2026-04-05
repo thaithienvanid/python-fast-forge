@@ -19,6 +19,7 @@ NOTE: These tests require the API server to be running on localhost:8000.
 import httpx
 import pytest
 
+
 # Check if API server is running before loading tests
 _server_available = False
 try:
